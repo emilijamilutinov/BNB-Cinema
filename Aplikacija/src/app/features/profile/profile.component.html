@@ -1,0 +1,48 @@
+<div class="profile-container">
+    <div class="account-info">
+        <h2 class="naloginfo">PODACI O NALOGU:</h2>
+        <p class="naloginfo"><strong>KORISNIČKO IME:  {{ username }}</strong></p>
+        <p class="naloginfo"><strong>E-MAIL: {{ email }}</strong></p>
+
+        <label for="username">Novo korisničko ime:</label>
+        <input type="text" id="username" placeholder="Unesite novo ime" [(ngModel)]="newUsername">
+        
+        <label for="password">Nova šifra:</label>
+        <input type="password" id="password" placeholder="Unesite novu šifru" [(ngModel)]="newPassword">
+        
+        <button class="save-button" (click)="updateProfile()">SACUVAJ PROMENE</button>
+        
+    </div>
+
+    <div class="reservations">
+        <h3>Vaše rezervacije:</h3>
+        <div class="table-container">
+            <table *ngIf="reservations.length > 0; else noReservations">
+                <thead>
+                    <tr>
+                        <th>Film</th>
+                        <th>Broj karata</th>
+                        <th>Datum</th>
+                        <th>Akcija</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let rezervacija of reservations">
+                        <td>{{ rezervacija.film_title }}</td>
+                        <td>{{ rezervacija.broj_karata }}</td>
+                        <td>{{ rezervacija.datum | date: 'yyyy-MM-dd' }}</td>
+                        <td>
+                            <button (click)="removeReservation(rezervacija.id)" class="save-button brisirez">Ukloni</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <ng-template #noReservations>
+                <p>Trenutno nemate rezervacije.</p>
+            </ng-template>
+        </div>
+    </div>
+    
+    
+    
+</div>

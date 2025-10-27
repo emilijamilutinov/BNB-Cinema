@@ -1,0 +1,59 @@
+<div class="rezervacija-container" *ngIf="film">
+  <h1>Rezervacija za: {{ film.title }}</h1>
+
+  <div class="film-info">
+    <img [src]="film.poster" alt="{{ film.title }}">
+    <p><strong>Režiser:</strong> {{ film.director?.name }}</p>
+    <p><strong>Godina:</strong> {{ film.startDate }}</p>
+    <p><strong>Žanr:</strong> {{ film.genre }}
+    </p>
+  </div>
+
+  <!-- LEGENDA -->
+  <div class="legend">
+    <span class="seat badge regular" aria-hidden="true"></span> Regular {{ prices.REGULAR | number:'1.2-2' }} €
+    <span class="seat badge vip" aria-hidden="true"></span> VIP {{ prices.VIP | number:'1.2-2' }} €
+    <span class="seat badge taken" aria-hidden="true"></span> Zauzeto
+    <span class="seat badge selected" aria-hidden="true"></span> Izabrano
+  </div>
+
+  <!-- GRID SEDIŠTA (5 x 8) -->
+  <div class="seats-grid" role="grid" aria-label="Izbor sedišta">
+    <div class="row" *ngFor="let r of ['A','B','C','D','E']; let i = index" role="row">
+      <div class="row-label" role="rowheader">{{ r }}</div>
+
+      <div class="seat"
+           *ngFor="let seat of seats | slice:(i*8):(i*8+8)"
+           [class.vip]="seat.type === 'VIP'"
+           [class.taken]="seat.status === 'TAKEN'"
+           [class.selected]="isSelected(seat)"
+           (click)="toggleSeat(seat)"
+           role="gridcell"
+           [attr.aria-disabled]="seat.status === 'TAKEN' ? true : null"
+           [attr.aria-selected]="isSelected(seat) ? true : null"
+           [attr.title]="'Red ' + seat.row + ', mesto ' + seat.num">
+        {{ seat.num }}
+      </div>
+    </div>
+  </div>
+
+  <!-- PODACI I SUMA -->
+  <form class="rez-form">
+    <label>
+      Vaše ime:
+      <input type="text" [(ngModel)]="korisnickoIme" name="korisnickoIme" required />
+    </label>
+
+    <label>
+      Datum projekcije:
+      <input type="date" [(ngModel)]="datum" name="datum" required />
+    </label>
+
+    <div class="total">
+      Izabrano sedišta: <strong>{{ selectedSeatIds.length }}</strong> |
+      Ukupno: <strong>{{ totalPrice | number:'1.2-2' }} €</strong>
+    </div>
+
+    <button type="button" (click)="potvrdiRezervaciju()">Potvrdi rezervaciju</button>
+  </form>
+</div>

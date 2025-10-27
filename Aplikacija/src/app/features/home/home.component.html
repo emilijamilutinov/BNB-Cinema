@@ -1,0 +1,31 @@
+<div class="home-container">
+  <h1>Dobrodošli u BNB Cinema </h1>
+
+  <div class="slider">
+    <div class="slide" *ngFor="let film of randomFilmovi">
+      <img [src]="film.poster" [alt]="film.title || 'Poster filma'">
+    </div>
+  </div>
+
+  <div class="home-text">
+    <h2>Najbolji bioskopski doživljaj u gradu! </h2>
+    <p>
+      U BNB Cinema, doživite filmove na potpuno nov način. 
+      Vrhunska tehnologija, udobna sedišta i neverovatan zvuk čine da svaki film postane nezaboravan trenutak!
+    </p>
+  </div>
+
+  
+  <a [routerLink]="['/filmovi']" class="home-button">
+    <i class="fa-solid fa-ticket"></i> Pogledaj filmove
+  </a>
+
+  <section class="trivia-section">
+    <h2><i class="fa-solid fa-video"></i> Da li ste znali?</h2>
+    <ul>
+      <li>Prvi bioskop je otvoren 1895. godine u Parizu!</li>
+      <li><i class="fa-solid fa-video"></i> Najskuplji film svih vremena je "Avatar: The Way of Water" sa budžetom preko 400M$!</li>
+      <li>Zvuk hrskavih čipsa u filmovima se često simulira lomljenjem celera!</li>
+    </ul>
+  </section>
+</div>

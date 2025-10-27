@@ -1,0 +1,111 @@
+<div class="container">
+    <div class="search-container">
+        <input type="text" class="search-bar" placeholder="Pretraži po naslovu..." [(ngModel)]="searchTitle" (input)="filterMovies()">
+        <input type="text" class="search-bar" placeholder="Pretraži po režiseru..." [(ngModel)]="searchDirector" (input)="filterMovies()">
+        <input type="text" class="search-bar" placeholder="Pretraži po žanru..." [(ngModel)]="searchGenre" (input)="filterMovies()">
+        <input type="date" class="search-bar" [(ngModel)]="searchYear" (change)="filterMovies()" max="9999-12-31">
+      </div>
+      
+<div class="svifilmovi">
+    <div class="lista" *ngFor="let film of filteredFilmovi">
+        <div class="film">
+            <div class="filmgore">
+                <div class="film-hover" (mouseover)="hoveredFilm = film" (mouseleave)="hoveredFilm = null" (click)="openFilmDetails(film)">
+                    <img [src]="film.poster" alt="{{ film.title }}">
+                    <div class="overlay" *ngIf="hoveredFilm === film">Više informacija</div>
+                </div>
+            </div>
+            
+            <div class="filmdole">
+                <div class="film-info">
+                    <h2>{{ film.title }}</h2>
+                    
+                    <a 
+                        *ngIf="isLoggedIn" 
+                        [attr.href]="'/rezervacija/' + film.title"
+                        class="rezervisi-button">
+                        <i class="fa-solid fa-ticket"></i> Rezerviši
+                    </a>
+            
+                    <a 
+                        *ngIf="!isLoggedIn" 
+                        [attr.href]="'/login'"
+                        class="rezervisi-button">
+                        <i class="fa-solid fa-ticket"></i> Rezerviši
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+<div *ngIf="rezervisaniFilmovi.length > 0" class="rezervisani-container">
+    <h2><i class="fa-solid fa-ticket"></i> Moje rezervacije</h2>
+    <ul class="rezervisani-list">
+        <li *ngFor="let film of rezervisaniFilmovi">
+            {{ film.title }}
+            <button class="otkazi-button" (click)="otkaziRezervaciju(film.title)">Otkazi</button>
+        </li>
+    </ul>
+</div>
+
+
+
+  <div *ngIf="selectedFilm" class="modal" (click)="closeModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+          <span class="close" (click)="closeModal()">&times;</span>
+          
+<h2 class="modal-title">
+  {{ selectedFilm.title }}
+  <span class="average-rating">⭐ {{ averageRating.toFixed(1) }}</span>
+</h2>
+
+<img class="modal-img-small" [src]="selectedFilm.poster" alt="{{ selectedFilm.title }}">
+
+<p><strong>Režiser:</strong> {{ selectedFilm.director.name }}</p>
+<p><strong>Godina:</strong> {{ selectedFilm.startDate }}</p>
+<p><strong>Žanr:</strong> {{ getGenresAsString(selectedFilm) }}</p>
+
+  
+<p><strong>Opis:</strong> {{ selectedFilm.shortDescription }}</p>
+
+<hr>
+
+          <div class="review-container">
+              <h3>Oceni film:</h3>
+
+              <div class="rating-box">
+                  <label for="rating">Ocena:</label>
+                  <select id="rating" [(ngModel)]="selectedRating">
+                      <option *ngFor="let r of [1, 2, 3, 4, 5]" [value]="r">{{ r }}</option>
+                  </select>
+              </div>
+
+              <div class="comment-box">
+                  <label for="comment">Komentar:</label>
+                  <textarea id="comment" [(ngModel)]="selectedComment" placeholder="Napišite komentar..."></textarea>
+              </div>
+
+              <button class="save-button" (click)="submitReview()">💾 Sačuvaj</button>
+          </div>
+
+          <hr>
+
+          <h3>Komentari:</h3>
+
+          <ul class="comments-list" *ngIf="filmReviews.length > 0; else noReviews">
+            <li *ngFor="let review of filmReviews">
+              <strong>Ocena:</strong> {{ review.rating }} ⭐ - {{ review.comment }} | {{ review.username }}
+            </li>
+          </ul>
+          
+          <ng-template #noReviews>
+            <p style="color: #aaa; font-style: italic;">Trenutno nema komentara za ovaj film.</p>
+          </ng-template>
+      </div>
+  </div>
+
+

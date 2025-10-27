@@ -1,0 +1,160 @@
+/* KONTEJNER */
+.rezervacija-container {
+  max-width: 680px;
+  margin: 40px auto;
+  padding: 20px;
+  background: #222;
+  border-radius: 12px;
+  color: #f5c518;
+  text-align: center;
+  box-shadow: 0 0 15px rgba(245, 197, 24, 0.35);
+}
+
+/* INFO O FILMU */
+.film-info {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+}
+.film-info img {
+  width: 100%;
+  max-width: 420px;
+  max-height: 400px;
+  height: auto;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(255, 204, 0, 0.5);
+}
+
+/* LEGENDA */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  color: #ddd;
+  margin: 14px 0 8px;
+}
+.badge {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  border-radius: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.badge.regular { background: #2a2a2a; }
+.badge.vip     { background: #3b2e00; }
+.badge.taken   { background: #5a1a1a; }
+.badge.selected{ background: #0f5132; }
+
+/* GRID SEDIŠTA */
+.seats-grid {
+  margin: 12px auto 20px;
+  width: min(680px, 100%);
+  background: #1b1b1b;
+  padding: 16px;
+  border-radius: 12px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 36px repeat(8, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+.row-label {
+  color: #f5c518;
+  text-align: center;
+  font-weight: 600;
+}
+.seat {
+  background: #2a2a2a;
+  color: #eee;
+  text-align: center;
+  padding: 10px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: transform .12s, background .15s, border-color .15s;
+}
+.seat:hover     { transform: translateY(-1px); border-color: #666; }
+.seat.vip       { background: #3b2e00; }   /* VIP vizuelno */
+.seat.selected  { background: #0f5132; }   /* izabrano */
+.seat.taken     { background: #5a1a1a; cursor: not-allowed; }
+
+/* FORMA */
+.rez-form {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+  margin: 0 auto;
+  background: rgba(255, 215, 0, 0.08);
+  padding: 14px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.15);
+}
+.rez-form label {
+  display: grid;
+  gap: 6px;
+  color: #ffcc00;
+  text-align: left;
+  font-weight: 700;
+}
+.rez-form input {
+  padding: 10px 12px;
+  border: 2px solid #f5c518;
+  border-radius: 8px;
+  background: #111;
+  color: #f5c518;
+  font-size: 16px;
+  text-align: center;
+  transition: 0.2s;
+}
+.rez-form input:focus {
+  border-color: #ffcc00;
+  background: #222;
+  outline: none;
+}
+.total {
+  margin-top: 6px;
+  color: #f5c518;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* DUGME */
+.rez-form button {
+  padding: 12px;
+  background: linear-gradient(45deg, #ffcc00, #ff6600);
+  color: #000;
+  font-weight: 800;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  text-transform: uppercase;
+  transition: all 0.25s ease-in-out;
+  box-shadow: 0 4px 8px rgba(255, 204, 0, 0.45);
+}
+.rez-form button:hover {
+  background: linear-gradient(45deg, #ff6600, #ffcc00);
+  transform: scale(1.03);
+  box-shadow: 0 6px 12px rgba(255, 204, 0, 0.6);
+}
+.rez-form button:active {
+  transform: scale(0.98);
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .rezervacija-container { max-width: 92%; }
+  .film-info img { max-height: 220px; }
+  .row { grid-template-columns: 30px repeat(8, 1fr); gap: 6px; }
+  .seat { padding: 9px 0; }
+  .rez-form button { font-size: 14px; padding: 10px; }
+}

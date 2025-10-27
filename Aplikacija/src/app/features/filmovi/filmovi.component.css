@@ -1,0 +1,552 @@
+.container {
+    width: 80%;
+    max-width: 1400px;
+    margin: auto;
+    padding: 20px;
+    text-align: center;
+}
+
+.search-container {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding: 15px;
+    background: rgba(255, 215, 0, 0.1); 
+    border-radius: 10px;
+}
+
+.search-bar {
+    flex: 1;
+    min-width: 220px;
+    padding: 12px;
+    border: 2px solid #f5c518;
+    border-radius: 8px;
+    background: #111;
+    color: #f5c518;
+    font-size: 16px;
+    text-align: center;
+    transition: 0.3s;
+}
+
+.search-bar:hover {
+    background: #222;
+}
+
+.svifilmovi {
+    background-color: #111; 
+    width: 100%;
+    max-width: 1600px;
+    margin: auto;
+    padding: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    border-radius: 10px;
+}
+
+.lista {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.lista:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(245, 197, 24, 0.7);
+}
+
+.film {
+    width: 280px;
+    height: 450px;
+    background: #222;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: 0.3s;
+    cursor: pointer;
+}
+
+.filmgore {
+    background: #222;
+    height: 80%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 10px 10px 0 0;
+}
+
+.filmgore img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+}
+
+.filmgore img:hover {
+    transform: scale(1.1);
+}
+
+.filmdole {
+    height: 20%;
+    background: rgba(0, 0, 0, 0.8);
+    color: #f5c518;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+}
+
+.film-hover {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.film-hover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: filter 0.3s ease-in-out;
+}
+
+.film-hover:hover img {
+    filter: brightness(50%);
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6); 
+    color: #f5c518;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    text-align: center;
+}
+
+.film-hover:hover .overlay {
+    opacity: 1;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.no-scroll {
+    overflow: hidden !important;
+    height: 100vh !important;
+    position: fixed !important;
+    width: 100%;
+    touch-action: none; 
+}
+
+
+.modal {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7); 
+    backdrop-filter: blur(8px); 
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+
+.modal-content {
+    background: linear-gradient(135deg, #1a1a1a, #333); 
+    padding: 25px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-radius: 12px;
+    text-align: center;
+    color: #f5c518;
+    position: relative;
+    box-shadow: 0 8px 20px rgba(245, 197, 24, 0.2);
+    animation: scaleUp 0.3s ease-in-out;
+}
+
+
+.close {
+    position: absolute;
+    top: 12px;
+    right: 15px;
+    font-size: 28px;
+    cursor: pointer;
+    color: #f5c518;
+    transition: all 0.3s ease-in-out;
+    background: rgba(245, 197, 24, 0.2);
+    padding: 5px 13px;
+    border-radius: 50%;
+}
+
+.close:hover {
+    background: rgba(245, 197, 24, 0.5);
+    transform: scale(1.1);
+    color: #ff4747;
+}
+
+
+.average-rating {
+    font-size: 18px;
+    background: #f5c518;
+    color: #000;
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin-left: 10px;
+    font-weight: bold;
+    box-shadow: 0px 4px 8px rgba(245, 197, 24, 0.4);
+}
+
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        padding: 20px;
+    }
+}
+
+
+
+.review-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    background: rgba(255, 215, 0, 0.15); 
+    padding: 20px;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 450px;
+    margin: auto;
+    box-shadow: 0px 6px 12px rgba(255, 215, 0, 0.3);
+    animation: fadeIn 0.4s ease-in-out;
+}
+
+
+.review-container h3 {
+    color: #f5c518;
+    font-size: 22px;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+}
+
+
+.rating-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.rating-box label {
+    font-size: 16px;
+    color: #ffcc00;
+    font-weight: bold;
+}
+
+
+.rating-box select {
+    padding: 10px;
+    border-radius: 6px;
+    background: #222;
+    color: #f5c518;
+    border: 2px solid #f5c518;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.3s ease-in-out;
+}
+
+.rating-box select:hover {
+    background: #333;
+}
+
+
+.comment-box {
+    display: flex;
+    flex-direction: column;
+    margin: auto;
+    width: 80%;
+}
+
+.comment-box label {
+    font-size: 16px;
+    color: #ffcc00;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+
+.comment-box textarea {
+    width: 100%;
+    height: 90px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #111;
+    color: #f5c518;
+    border: 2px solid #f5c518;
+    font-size: 15px;
+    resize: none;
+    transition: all 0.3s ease-in-out;
+}
+
+.comment-box textarea:focus {
+    border-color: #ffcc00;
+    background: #222;
+    outline: none;
+}
+
+
+.save-button {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(45deg, #ffcc00, #ff6600);
+    color: black;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    text-transform: uppercase;
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0px 4px 8px rgba(255, 204, 0, 0.5);
+}
+
+.save-button:hover {
+    background: linear-gradient(45deg, #ff6600, #ffcc00);
+    transform: scale(1.05);
+    box-shadow: 0px 6px 12px rgba(255, 204, 0, 0.7);
+}
+
+.save-button:active {
+    transform: scale(0.95);
+}
+
+
+.modal-img-small {
+    width: 60%;
+    max-height: 300px;
+    object-fit: cover;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    box-shadow: 0px 5px 10px rgba(245, 197, 24, 0.5);
+}
+
+
+.comments-list {
+    max-height: 250px;
+    overflow-y: auto;
+    background: rgba(255, 215, 0, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    border: 2px solid #f5c518;
+    list-style: none;
+    margin: 12px 0;
+    box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+
+.comments-list li {
+    padding: 10px;
+    border-bottom: 1px solid #444;
+    color: #f5c518;
+    font-size: 15px;
+    transition: 0.3s ease-in-out;
+}
+
+.comments-list li:hover {
+    background: rgba(255, 215, 0, 0.2);
+}
+
+.delete-button {
+    width: 100%;
+    padding: 10px;
+    background: red;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s, transform 0.2s;
+}
+
+.delete-button:hover {
+    background: darkred;
+    transform: scale(1.05);
+}
+
+.delete-button:active {
+    transform: scale(0.95);
+}
+
+
+@media (max-width: 768px) {
+    .review-container {
+        max-width: 90%;
+    }
+
+    .modal-img-small {
+        max-width: 80%;
+        height: auto;
+    }
+
+    .save-button, .delete-button {
+        font-size: 14px;
+        padding: 10px;
+    }
+}
+
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+.rezervisi-button {
+    display: inline-block;
+    background: linear-gradient(45deg, #ffcc00, #ff6600);
+    color: black;
+    font-weight: bold;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 10px 15px;
+    border-radius: 8px;
+    transition: all 0.3s ease-in-out;
+    font-size: 14px;
+    box-shadow: 0 4px 8px rgba(255, 204, 0, 0.5);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.rezervisi-button:hover {
+    background: linear-gradient(45deg, #ff6600, #ffcc00);
+    transform: scale(1.1);
+    box-shadow: 0 6px 12px rgba(255, 204, 0, 0.7);
+}
+
+.rezervisi-button:active {
+    transform: scale(0.95);
+}
+
+.rezervisani-container {
+    margin-top: 30px;
+    padding: 20px;
+    background: rgba(255, 215, 0, 0.1);
+    border-radius: 10px;
+}
+
+.rezervisani-list {
+    list-style: none;
+    padding: 0;
+}
+
+.rezervisani-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    border-bottom: 1px solid #f5c518;
+}
+
+.otkazi-button {
+    background: red;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.otkazi-button:hover {
+    background: darkred;
+}
+
+
+.film-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 10px;
+}
+
+.film-info h2 {
+    font-size: 18px;
+    color: #f5c518;
+    margin: 0;
+    flex: 1; 
+    text-align: left;
+}
+
+.korpa-button {
+    background: #ff6600;
+    color: black;
+    font-weight: bold;
+    padding: 10px 15px;
+    border-radius: 8px;
+    transition: all 0.3s ease-in-out;
+    font-size: 14px;
+    box-shadow: 0 4px 8px rgba(255, 102, 0, 0.5);
+    cursor: pointer;
+    border: none;
+    margin-left: 10px;
+}
+
+.korpa-button:hover {
+    background: #ff4500;
+    transform: scale(1.1);
+}
+
+.korpa-button:active {
+    transform: scale(0.95);
+}

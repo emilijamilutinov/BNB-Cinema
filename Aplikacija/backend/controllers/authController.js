@@ -67,6 +67,6 @@ exports.login = async (req, res) => {
 
 exports.logout = (req, res) => {
   // kod stateless JWT "logout" je klijent-side (brisanje tokena).
-  // ovde samo vraćamo poruku; ili vodi blacklistu ako želiš.
+  // ovde samo vraćamo poruku; 
   res.json({ message: 'Uspešno ste se odjavili' });
 };

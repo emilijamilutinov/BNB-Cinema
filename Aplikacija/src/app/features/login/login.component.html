@@ -1,0 +1,23 @@
+<div class="login-wrapper">
+  <div class="login-container">
+    <h2>Prijava</h2>
+    
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+      <div class="input-group">
+        <label for="email">Email</label>
+        <input id="email" type="email" formControlName="email" placeholder="Unesite email" required>
+      </div>
+
+      <div class="input-group">
+        <label for="password">Lozinka</label>
+        <input id="password" type="password" formControlName="password" placeholder="Unesite lozinku" required>
+      </div>
+
+      <p *ngIf="errorMessage" class="error">{{ errorMessage }}</p>
+
+      <button type="submit">Prijavi se</button>
+
+      <p class="register-text">Nemate nalog? <a href="/signup">Registrujte se</a></p>
+    </form>
+  </div>
+</div>
