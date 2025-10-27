@@ -1,6 +1,6 @@
 import { Component, Inject, OnInit, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
-// import { AuthService } from '../../auth.service'; // ← nije potreban ovde
+//import { AuthService } from '../../auth.service'; // ← nije potreban ovde
 import { jwtDecode } from 'jwt-decode';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -63,20 +63,18 @@ export class ProfileComponent implements OnInit {
     if (!this.isBrowser) return;
 
     this.http.get<any[]>(`http://localhost:4000/api/rezervacije`, {
-      headers: this.authHeaders()
-    }).subscribe({
-      next: (data) => {
-        // ako backend vraća 'YYYY-MM-DD', split nije potreban; ostavi ovako da radi i kad je ISO
-        this.reservations = (data || []).map(rez => ({
-          ...rez,
-          datum: typeof rez.datum === 'string' ? rez.datum.split('T')[0] : rez.datum
-        }));
-      },
-      error: (error) => {
-        console.error('Greška pri dohvatanju rezervacija:', error);
-        this.reservations = [];
-      }
-    });
+  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+}).subscribe({
+  next: (rows) => {
+    this.reservations = rows.map(r => ({
+      ...r,
+      seats: JSON.parse(r.seats_json || '[]'),   // array sedišta
+      datum: r.datum.split('T')[0] ?? r.datum
+    }));
+  },
+  error: () => this.reservations = []
+});
+
   }
 
   removeReservation(reservationId: number): void {

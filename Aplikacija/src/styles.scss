@@ -1,1 +1,20 @@
-/* You can add global styles to this file, and also import other style files */
+.movie-container {
+  text-align: center;
+  padding: 20px;
+}
+
+.movie-card {
+  display: inline-block;
+  width: 200px;
+  margin: 10px;
+  padding: 10px;
+  background: #222;
+  color: #f5c518;
+  border-radius: 8px;
+}
+
+.movie-card img {
+  width: 100%;
+  border-radius: 8px;
+}
+

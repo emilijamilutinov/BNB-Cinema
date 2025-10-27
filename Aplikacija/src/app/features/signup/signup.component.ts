@@ -23,31 +23,23 @@ export class SignupComponent {
     private router: Router
   ) {
     this.signupForm = this.fb.group({
-      username: ['', [Validators.required, Validators.minLength(3)]], 
+      username: ['', [Validators.required]], 
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]]
     });
   }
 
-  onSubmit(): void {
-  console.log('Signup submit klik'); // da vidiš da je klik stigao
+  onSubmit() {
+  if (this.signupForm.invalid) return;
 
-  if (this.signupForm.invalid) {
-    console.log('Forma nevažeća', this.signupForm.value);
-    return;
-  }
-
-  const { username, email, password } = this.signupForm.value;
-  console.log('Šaljem payload:', { username, email, password });
-
+  const { username, email, password } = this.signupForm.value; // <-- username
   this.authService.signup({ username, email, password }).subscribe({
-    next: (res) => {
-      console.log('Signup OK:', res);
-      this.router.navigate(['/login']);
-    },
+    next: () => this.router.navigate(['/login']),
     error: (err) => {
+      // lepši prikaz greški
+      const msg = err?.error?.message || 'Greška pri registraciji. Pokušajte ponovo.';
+      this.errorMessage = msg;
       console.error('Signup error:', err);
-      this.errorMessage = err?.error?.message || 'Greška pri registraciji. Pokušajte ponovo.';
     }
   });
 }

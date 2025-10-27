@@ -45,18 +45,26 @@ export class RezervacijaComponent implements OnInit {
     this.isBrowser = isPlatformBrowser(platformId);
   }
 
-  ngOnInit(): void {
-    const filmTitle = this.route.snapshot.paramMap.get('title'); // koristiš title u URL-u
+ ngOnInit(): void {
+  const filmTitle = this.route.snapshot.paramMap.get('title');
 
-    this.filmoviService.getFilmovi().subscribe((filmovi) => {
-      this.film = filmovi.find(
-        (f: any) => f.title.toLowerCase() === filmTitle?.toLowerCase()
-      );
-      // nakon što nađemo film, generiši (ili učitaj) raspored sedišta
-      this.initSeats();
-      this.restoreTakenSeatsForThisFilmAndDate(); // ako želiš da čuvaš već zauzeta sedišta lokalno
-    });
+  this.filmoviService.getFilmovi().subscribe((filmovi) => {
+    this.film = filmovi.find(
+      (f: any) => f.title.toLowerCase() === filmTitle?.toLowerCase()
+    );
+    this.initSeats();                // nacrtaj praznu salu
+    
+  });
   }
+
+  onDateChanged(): void {
+  if (!this.film || !this.datum) return;
+  this.initSeats();                      // reset statusa
+  this.restoreTakenSeatsForThisFilmAndDate(); // sada imamo datum → učitaj zauzeta
+  this.selectedSeatIds = [];             // reset izbora za novi datum  
+  }
+
+
 
   /** Demo generacija sale: 5 redova × 8 sedišta; kolone 4 i 5 su VIP */
   private initSeats(): void {
@@ -78,32 +86,36 @@ export class RezervacijaComponent implements OnInit {
     this.seats = seats;
   }
 
-  /** Ako želiš da simuliraš “zauzeto” po filmu & datumu u localStorage-u */
-  private restoreTakenSeatsForThisFilmAndDate(): void {
-    if (!this.isBrowser) return;
-    const key = this.takenKey();
-    const taken: number[] = JSON.parse(localStorage.getItem(key) || '[]');
-    const takenSet = new Set(taken);
-    this.seats = this.seats.map(s => ({ ...s, status: takenSet.has(s.id) ? 'TAKEN' : 'FREE' }));
-    // ako su neki već zauzeti, ukloni ih iz selekcije
-    this.selectedSeatIds = this.selectedSeatIds.filter(id => !takenSet.has(id));
+  
+  private takenKey(): string {
+  if (!this.film?.title || !this.datum) return '';  // bez datuma nema ključa
+  return `taken_${encodeURIComponent(this.film.title)}_${this.datum}`;
   }
 
-  private takenKey(): string {
-    // ključ u LS za "zauzeta" po naslovu filma + datumu projekcije
-    return `taken_${this.film?.title || 'film'}_${this.datum || 'no-date'}`;
+private restoreTakenSeatsForThisFilmAndDate(): void {
+  if (!this.isBrowser) return;
+  const key = this.takenKey();
+  if (!key) return; // nema datuma → ništa
+
+  const taken: number[] = JSON.parse(localStorage.getItem(key) || '[]');
+  const takenSet = new Set(taken);
+  this.seats = this.seats.map(s => ({
+    ...s,
+    status: takenSet.has(s.id) ? 'TAKEN' : 'FREE'
+  }));
+  this.selectedSeatIds = this.selectedSeatIds.filter(id => !takenSet.has(id));
   }
+
 
   toggleSeat(seat: Seat): void {
-    if (seat.status === 'TAKEN') return;
+  if (!this.datum) { alert('Prvo izaberite datum.'); return; }
+  if (seat.status === 'TAKEN') return;
 
-    const idx = this.selectedSeatIds.indexOf(seat.id);
-    if (idx >= 0) {
-      this.selectedSeatIds.splice(idx, 1);
-    } else {
-      this.selectedSeatIds.push(seat.id);
-    }
+  const idx = this.selectedSeatIds.indexOf(seat.id);
+  if (idx >= 0) this.selectedSeatIds.splice(idx, 1);
+  else this.selectedSeatIds.push(seat.id);
   }
+
 
   isSelected(seat: Seat): boolean {
     return this.selectedSeatIds.includes(seat.id);

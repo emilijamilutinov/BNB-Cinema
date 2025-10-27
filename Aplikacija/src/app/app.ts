@@ -1,4 +1,3 @@
-// src/app/app.component.ts
 import { Component, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
@@ -61,21 +60,63 @@ export class AppComponent {
     }
   }
 
-  potvrdiSveRezervacije() {
-    // za sada samo očisti korpu (dok ne napravimo backend rutu)
-    if (this.korpa.length === 0) {
-      alert('Vaša korpa je prazna.');
-      return;
-    }
-    if (!this.isLoggedIn) {
-      alert('Morate biti prijavljeni da biste potvrdili rezervacije.');
-      return;
-    }
-    localStorage.removeItem('korpa');
-    this.korpa = [];
-    this.cartOpen = false;
-    alert('Rezervacije potvrđene (demo).');
+  private API = 'http://localhost:4000'; 
+
+async potvrdiSveRezervacije(): Promise<void> {
+  if (this.korpa.length === 0) {
+    alert('Vaša korpa je prazna.');
+    return;
   }
+  if (!this.isLoggedIn) {
+    alert('Morate biti prijavljeni da biste potvrdili rezervacije.');
+    return;
+  }
+
+  const token = localStorage.getItem('token') || '';
+  for (const item of this.korpa) {
+    
+    const body = {
+      film_title: item.film?.title,     
+      datum: item.datum,                
+      seats: item.seats,               
+      total: item.total                
+    };
+
+    try {
+      const resp = await fetch(`${this.API}/api/rezervacije`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!resp.ok) {
+        
+        let msg = `HTTP ${resp.status}`;
+        try {
+          const data = await resp.json();
+          if (data?.message) msg = data.message;
+        } catch {}
+        alert(`Greška pri potvrdi: ${msg}`);
+        return; // prekini na prvoj greški
+      }
+    } catch (e) {
+      console.error('Network error:', e);
+      alert('Greška pri potvrdi: mrežna greška.');
+      return;
+    }
+  }
+
+  // Ako je svaki POST prošao:
+  alert('Sve rezervacije su potvrđene!');
+  this.korpa = [];
+  localStorage.removeItem('korpa');
+  this.cartOpen = false;
+}
+
+
 
   ukloniIzKorpe(rezervacija: any) {
     if (!isPlatformBrowser(this.platformId)) return;

@@ -18,24 +18,29 @@
   </div>
 
   <!-- GRID SEDIŠTA (5 x 8) -->
-  <div class="seats-grid" role="grid" aria-label="Izbor sedišta">
-    <div class="row" *ngFor="let r of ['A','B','C','D','E']; let i = index" role="row">
-      <div class="row-label" role="rowheader">{{ r }}</div>
+  <div *ngIf="!datum" style="color:#f5c518; margin:10px 0;">
+  Izaberite datum projekcije da biste birali sedišta.
+</div>
 
-      <div class="seat"
-           *ngFor="let seat of seats | slice:(i*8):(i*8+8)"
-           [class.vip]="seat.type === 'VIP'"
-           [class.taken]="seat.status === 'TAKEN'"
-           [class.selected]="isSelected(seat)"
-           (click)="toggleSeat(seat)"
-           role="gridcell"
-           [attr.aria-disabled]="seat.status === 'TAKEN' ? true : null"
-           [attr.aria-selected]="isSelected(seat) ? true : null"
-           [attr.title]="'Red ' + seat.row + ', mesto ' + seat.num">
-        {{ seat.num }}
-      </div>
+<div class="seats-grid" *ngIf="datum" role="grid" aria-label="Izbor sedišta">
+  <div class="row" *ngFor="let r of ['A','B','C','D','E']; let i = index" role="row">
+    <div class="row-label" role="rowheader">{{ r }}</div>
+
+    <div class="seat"
+         *ngFor="let seat of seats | slice:(i*8):(i*8+8)"
+         [class.vip]="seat.type === 'VIP'"
+         [class.taken]="seat.status === 'TAKEN'"
+         [class.selected]="isSelected(seat)"
+         (click)="toggleSeat(seat)"
+         role="gridcell"
+         [attr.aria-disabled]="seat.status === 'TAKEN' ? true : null"
+         [attr.aria-selected]="isSelected(seat) ? true : null"
+         [attr.title]="'Red ' + seat.row + ', mesto ' + seat.num">
+      {{ seat.num }}
     </div>
   </div>
+</div>
+
 
   <!-- PODACI I SUMA -->
   <form class="rez-form">
@@ -46,7 +51,8 @@
 
     <label>
       Datum projekcije:
-      <input type="date" [(ngModel)]="datum" name="datum" required />
+      <input type="date" id="datum" [(ngModel)]="datum" name="datum" required (change)="onDateChanged()">
+
     </label>
 
     <div class="total">
