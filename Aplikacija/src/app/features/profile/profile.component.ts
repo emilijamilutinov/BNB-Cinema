@@ -93,39 +93,43 @@ export class ProfileComponent implements OnInit {
       }
     });
   }
+  
 
   updateProfile(): void {
-    if (!this.isBrowser) return;
+  if (!this.isBrowser) return;
 
-    if (!this.newUsername && !this.newPassword) {
-      alert('Molimo unesite novo korisničko ime ili novu šifru.');
-      return;
-    }
-    if (this.newPassword && this.newPassword.length < 6) {
-      alert('Lozinka mora imati najmanje 6 karaktera.');
-      return;
-    }
-
-    const updatedData: any = { email: this.email };
-    if (this.newUsername) updatedData.username = this.newUsername;
-    if (this.newPassword) updatedData.password = this.newPassword;
-
-    // ispravljen metod i URL (PATCH + /api/users/update)
-    this.http.patch(`http://localhost:4000/api/users/update`, updatedData, {
-      headers: this.authHeaders()
-    }).subscribe({
-      next: () => {
-        alert('Podaci su uspešno ažurirani!');
-        this.loadUserData();       // osveži prikaz
-        this.newUsername = '';
-        this.newPassword = '';
-      },
-      error: (error) => {
-        console.error('Greška pri ažuriranju profila:', error);
-        alert('Greška pri ažuriranju podataka.');
-      }
-    });
+  if (!this.newUsername && !this.newPassword) {
+    alert('Molimo unesite novo korisničko ime ili novu šifru.');
+    return;
   }
+  if (this.newPassword && this.newPassword.length < 6) {
+    alert('Lozinka mora imati najmanje 6 karaktera.');
+    return;
+  }
+
+  const payload: any = {};
+  if (this.newUsername) payload.username = this.newUsername.trim();
+  if (this.newPassword) payload.password = this.newPassword;
+
+  this.http.patch('http://localhost:4000/api/user', payload, {
+    headers: this.authHeaders()
+  }).subscribe({
+    next: (res: any) => {
+      // backend vraća novi token ako je promenjen username
+      if (res?.token) localStorage.setItem('token', res.token);
+      alert('Podaci su uspešno ažurirani!');
+      this.loadUserData();
+      this.newUsername = '';
+      this.newPassword = '';
+    },
+    error: (err) => {
+      console.error('Greška pri ažuriranju profila:', err);
+      alert(err?.error?.message || 'Greška pri ažuriranju podataka.');
+    }
+  });
+}
+
+
 
   logout(): void {
     if (this.isBrowser) {
