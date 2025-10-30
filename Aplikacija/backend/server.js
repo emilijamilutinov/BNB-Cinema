@@ -38,6 +38,7 @@ function auth(req, res, next) {
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
 // ===================== AUTH =====================
+//Registracija korisnika
 app.post("/api/auth/signup", async (req, res) => {
   const { username, email, password } = req.body || {};
   if (!username || !email || !password)
@@ -58,6 +59,7 @@ app.post("/api/auth/signup", async (req, res) => {
     res.status(500).json({ message: "Greška pri registraciji" });
   }
 });
+//Prijava korisnika
 
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body || {};
@@ -239,9 +241,9 @@ app.post('/api/reviews', auth, async (req, res) => {
     }
     if (!filmId) filmId = makeIdFromTitle(filmTitle);
 
-    // proveru gledanja uključi samo ako želiš (ENV)
+    // proveru gledanja uključi u (ENV)
     if (process.env.REVIEW_REQUIRE_RESERVATION !== 'false') {
-      const norm = s => (s || '').toLowerCase()
+      const norm = s => (s || '').toLowerCase()  //normalizator naziva filma
         .replace(/["'’‘“”\-.,:;(){}\[\]!?\s]/g, '')
         .replace(/č/g,'c').replace(/ć/g,'c').replace(/š/g,'s').replace(/ž/g,'z').replace(/đ/g,'dj');
 

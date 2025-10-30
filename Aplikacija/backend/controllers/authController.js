@@ -1,6 +1,6 @@
 // backend/controllers/authController.js
 const db = require('../config/db');   // mysql2/promise pool
-const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken'); 
 const bcrypt = require('bcrypt');     
 
 exports.signup = async (req, res) => {

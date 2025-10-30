@@ -66,12 +66,20 @@ export class ProfileComponent implements OnInit {
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
 }).subscribe({
   next: (rows) => {
-    this.reservations = rows.map(r => ({
-      ...r,
-      seats: JSON.parse(r.seats_json || '[]'),   // array sedišta
-      datum: r.datum.split('T')[0] ?? r.datum
-    }));
-  },
+    this.reservations = rows.map(r => {
+        // seats može biti string (JSON) ili već objekat — pokrij oba slučaja
+        const seats = Array.isArray(r.seats_json) ? r.seats_json
+                     : JSON.parse(r.seats_json || '[]');
+
+        return {
+          ...r,
+          seats,
+          brojKarata: seats.length,
+          total: Number(r.total_eur ?? 0),
+          datum: (r.datum?.split?.('T')?.[0]) ?? r.datum
+        };
+      });
+    },
   error: () => this.reservations = []
 });
 

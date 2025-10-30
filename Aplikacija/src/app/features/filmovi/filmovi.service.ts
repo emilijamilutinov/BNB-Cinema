@@ -10,7 +10,7 @@ export class FilmoviService {
   private externalApiUrl =
     'https://movie.pequla.com/api/movie?director=&actor=&search=&genre=';
 
-  // Tvoj backend: prefiks /api
+  // moj backend: prefiks /api
   private apiBase = 'http://localhost:4000/api';
 
   private isBrowser: boolean;
@@ -31,8 +31,34 @@ export class FilmoviService {
       })
     );
   }
+  /////odavde ////
+  private authHeaders(): HttpHeaders {
+    if (!this.isBrowser) return new HttpHeaders();
+    const token = localStorage.getItem('token');
+    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
+  }
 
-  /** Recenzije za film (kad dodaš rute na backendu) */
+  getTakenSeats(film_title: string, datum: string): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiBase}/taken-seats`, {
+      params: { film_title, datum }
+    });
+  }
+
+  // >>> potvrda rezervacije (čuva u bazi)
+  postRezervacija(body: {
+    film_title: string;
+    datum: string;
+    seats: { row: string; num: number }[];
+    total: number; // ili 0 ako računaš na serveru
+  }): Observable<any> {
+    return this.http.post(`${this.apiBase}/rezervacije`, body, {
+      headers: this.authHeaders()
+    });
+  }
+  ////do ovde ///
+
+
+  /** Recenzije za film  */
   getReviews(movieId: number): Observable<any[]> {
   return this.http
     .get<any[]>(`${this.apiBase}/reviews/${movieId}`)

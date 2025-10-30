@@ -57,16 +57,44 @@ export class RezervacijaComponent implements OnInit {
   });
   }
 
-  onDateChanged(): void {
+
+  /*onDateChanged(): void {
   if (!this.film || !this.datum) return;
   this.initSeats();                      // reset statusa
   this.restoreTakenSeatsForThisFilmAndDate(); // sada imamo datum → učitaj zauzeta
   this.selectedSeatIds = [];             // reset izbora za novi datum  
-  }
+  }*/ 
+  onDateChanged(): void {
+  if (!this.film || !this.datum) return;
+  this.initSeats();                // reset sale
+  this.selectedSeatIds = [];       // reset izbora
+  this.restoreTakenSeatsFromAPI(); // <<< umesto LS varijante
+}
+private restoreTakenSeatsFromAPI(): void {
+  if (!this.film?.title || !this.datum) return;
+
+  this.filmoviService.getTakenSeats(this.film.title, this.datum)
+    .subscribe((takenCodes: string[]) => {
+      const taken = new Set(takenCodes); // npr. ["A4","B7"]
+
+      this.seats = this.seats.map(s => {
+        const code = `${s.row}${s.num}`; // isti format kao seat_code u bazi
+        return { ...s, status: taken.has(code) ? 'TAKEN' : 'FREE' };
+      });
+
+      // ako je nešto u međuvremenu postalo zauzeto, skini iz selekcije
+      this.selectedSeatIds = this.selectedSeatIds.filter(id => {
+        const seat = this.seats.find(x => x.id === id)!;
+        return seat.status !== 'TAKEN';
+      });
+    });
+}
+//i ovo je dodato
 
 
 
-  /** Demo generacija sale: 5 redova × 8 sedišta; kolone 4 i 5 su VIP */
+
+  /** generacija sale: 5 redova × 8 sedišta; kolone 4 i 5 su VIP */
   private initSeats(): void {
     const rows = ['A','B','C','D','E'];
     const perRow = 8;
@@ -87,12 +115,12 @@ export class RezervacijaComponent implements OnInit {
   }
 
   
-  private takenKey(): string {
+  /*private takenKey(): string {
   if (!this.film?.title || !this.datum) return '';  // bez datuma nema ključa
   return `taken_${encodeURIComponent(this.film.title)}_${this.datum}`;
-  }
+  }*/
 
-private restoreTakenSeatsForThisFilmAndDate(): void {
+/*private restoreTakenSeatsForThisFilmAndDate(): void {
   if (!this.isBrowser) return;
   const key = this.takenKey();
   if (!key) return; // nema datuma → ništa
@@ -104,7 +132,7 @@ private restoreTakenSeatsForThisFilmAndDate(): void {
     status: takenSet.has(s.id) ? 'TAKEN' : 'FREE'
   }));
   this.selectedSeatIds = this.selectedSeatIds.filter(id => !takenSet.has(id));
-  }
+  }*/
 
 
   toggleSeat(seat: Seat): void {
@@ -132,7 +160,7 @@ private restoreTakenSeatsForThisFilmAndDate(): void {
   }
 
   /** Potvrda – dodaje u “korpu” u LS + (opciono) obeleži izabrana sedišta kao zauzeta */
-  potvrdiRezervaciju(): void {
+  /*potvrdiRezervaciju(): void {
     if (!this.film) { alert('Film nije učitan.'); return; }
     if (!this.korisnickoIme.trim()) { alert('Unesite ime.'); return; }
     if (!this.datum) { alert('Izaberite datum.'); return; }
@@ -156,7 +184,7 @@ private restoreTakenSeatsForThisFilmAndDate(): void {
       korpa.push(rezervacija);
       localStorage.setItem('korpa', JSON.stringify(korpa));
 
-      // 2) obeleži kao zauzeta (da drugi put budu siva u ovoj demo varijanti)
+      // 2) obeleži kao zauzeta 
       const key = this.takenKey();
       const prevTaken: number[] = JSON.parse(localStorage.getItem(key) || '[]');
       const newTaken = Array.from(new Set([...prevTaken, ...this.selectedSeatIds]));
@@ -166,5 +194,37 @@ private restoreTakenSeatsForThisFilmAndDate(): void {
     this.korpaOsvezena.emit();
     alert(`"${this.film.title}" je dodat u korpu!`);
     this.router.navigate(['/filmovi']);
-  }
+  }*/
+ potvrdiRezervaciju(): void {
+  if (!this.film) { alert('Film nije učitan.'); return; }
+  if (!this.korisnickoIme.trim()) { alert('Unesite ime.'); return; }
+  if (!this.datum) { alert('Izaberite datum.'); return; }
+  if (this.selectedSeatIds.length === 0) { alert('Izaberite bar jedno sedište.'); return; }
+
+  // serveru je dosta row+num (type/price nisu potrebni)
+  const seatsMin = this.selectedSeatIds
+    .map(id => this.seats.find(s => s.id === id)!)
+    .map(s => ({ row: s.row, num: s.num }));
+
+  const payload = {
+    film_title: this.film.title,
+    datum: this.datum,
+    seats: seatsMin,
+    total: this.totalPrice, // ili 0, pa račun na serveru (bezbednije)
+  };
+
+  this.filmoviService.postRezervacija(payload).subscribe({
+    next: () => {
+      this.korpaOsvezena.emit();
+      alert(`"${this.film.title}" je uspešno rezervisan!`);
+      this.router.navigate(['/filmovi']);
+    },
+    error: (err) => {
+      alert(err?.error?.message || 'Greška pri potvrdi');
+      // neko je u međuvremenu zauzeo sedište → osveži stanje iz baze
+      if (err?.status === 409) this.restoreTakenSeatsFromAPI();
+    }
+  });
+}
+
 }
