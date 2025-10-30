@@ -81,15 +81,14 @@ export class FilmoviComponent {
     this.username = this.isLoggedIn ? this.getUsernameFromToken() : '';
   }
 
-  // Modal
   openFilmDetails(film: any): void {
-    this.selectedFilm = film;
-    if (film?.movieId != null) this.loadReviews(film.movieId);
-    if (this.isBrowser) {
-      document.body.classList.add('no-scroll');
-      document.documentElement.classList.add('no-scroll');
-    }
-  }
+  this.selectedFilm = film;
+  const mid = this.getMovieId(film) ?? this.makeIdFromTitle(film.title);
+  this.loadReviews(mid);
+  if (this.isBrowser) { document.body.classList.add('no-scroll'); document.documentElement.classList.add('no-scroll'); }
+}
+
+
 
   closeModal(): void {
     this.selectedFilm = null;
@@ -101,53 +100,52 @@ export class FilmoviComponent {
     }
   }
 
-  // Reviews
   loadReviews(movieId: number): void {
-    this.filmoviService.getReviews(movieId).subscribe({
-      next: (reviews) => {
-        this.filmReviews = reviews || [];
-        this.calculateAverageRating();
-      },
-      error: (err) => console.error('Greška pri učitavanju recenzija:', err),
-    });
-  }
+  this.filmoviService.getReviews(movieId).subscribe({
+    next: (reviews) => {
+      this.filmReviews = reviews || [];
+      this.calculateAverageRating();
+    },
+    error: (err) => console.error('Greška pri učitavanju recenzija:', err),
+  });
+
+  this.filmoviService.getAvgRating(movieId).subscribe({
+    next: (x) => { this.averageRating = typeof x?.avg === 'number' ? x.avg : 0; },
+    error: () => { this.averageRating = 0; }
+  });
+}
+
 
   submitReview(): void {
-    if (!this.isLoggedIn) {
-      alert('Morate biti prijavljeni da biste ocenili film.');
-      return;
-    }
-    if (!this.selectedFilm) return;
+  if (!this.isLoggedIn || !this.selectedFilm) return;
+  if (!this.selectedRating || !this.selectedComment.trim()) { alert('Unesite i ocenu i komentar.'); return; }
 
-    if (!this.selectedRating || !this.selectedComment.trim()) {
-      alert('Unesite i ocenu i komentar.');
-      return;
-    }
+  const filmId = this.getMovieId(this.selectedFilm) ?? this.makeIdFromTitle(this.selectedFilm.title);
 
-    const body = {
-      filmId: this.selectedFilm.movieId,
-      rating: this.selectedRating,
-      comment: this.selectedComment.trim(),
-    };
+  const body = {
+    filmId,
+    filmTitle: this.selectedFilm.title, // VAŽNO: backend proverava po naslovu
+    rating: this.selectedRating,
+    comment: this.selectedComment.trim(),
+  };
 
-    this.filmoviService.submitReview(body).subscribe({
-      next: () => {
-        this.selectedComment = '';
-        this.selectedRating = 5;
-        this.loadReviews(this.selectedFilm.movieId);
-      },
-      error: (err) => console.error('Greška pri slanju recenzije:', err),
-    });
-  }
+  this.filmoviService.submitReview(body).subscribe({
+    next: () => {
+      this.selectedComment = '';
+      this.selectedRating = 5;
+      this.loadReviews(filmId);             // ← ovde prosleđujemo ID (broj), ne funkciju
+    },
+    error: (err) => console.error('Greška pri slanju recenzije:', err),
+  });
+}
 
-  calculateAverageRating(): void {
-    if (!this.filmReviews?.length) {
-      this.averageRating = 0;
-      return;
-    }
-    const total = this.filmReviews.reduce((s, r) => s + (r.rating || 0), 0);
-    this.averageRating = total / this.filmReviews.length;
-  }
+calculateAverageRating(): void {
+  if (!this.filmReviews?.length) { this.averageRating = 0; return; }
+  const total = this.filmReviews.reduce((s, r) => s + Number(r?.rating || 0), 0);
+  this.averageRating = total / this.filmReviews.length;
+}
+
+
 
   // Filters
   filterMovies(): void {
@@ -205,4 +203,23 @@ export class FilmoviComponent {
     if (!this.isBrowser) return;
     this.korpa = JSON.parse(localStorage.getItem('korpa') || '[]');
   }
+  
+
+private getMovieId(film: any): number | undefined {
+  return film?.movieId ?? film?.id; // šta god tvoj API pošalje
+}
+
+private makeIdFromTitle(title: string): number {
+  const norm = (title || '')
+    .toLowerCase()
+    .replace(/["'’‘“”\-\.\,\:\;\(\)\[\]\{\}\s]/g, '')
+    .replace(/č/g,'c').replace(/ć/g,'c').replace(/š/g,'s').replace(/ž/g,'z').replace(/đ/g,'dj');
+  // jednostavan deterministički hash (djb2)
+  let h = 5381;
+  for (let i = 0; i < norm.length; i++) h = ((h << 5) + h) + norm.charCodeAt(i);
+  return Math.abs(h);
+}
+
+
+
 }
