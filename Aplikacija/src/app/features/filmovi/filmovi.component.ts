@@ -57,7 +57,7 @@ export class FilmoviComponent {
     this.ucitajKorpu();
   }
 
-  // UI helpers
+  
   getGenresAsString(film: any): string {
     if (!film?.movieGenres) return '';
     return film.movieGenres.map((g: any) => g.genre?.name).filter(Boolean).join(', ');
@@ -163,7 +163,7 @@ calculateAverageRating(): void {
     });
   }
 
-  // Local storage helpers
+  
   loadRezervisaniFilmovi(): void {
     if (!this.isBrowser) return;
     this.rezervisaniFilmovi = JSON.parse(localStorage.getItem('rezervisaniFilmovi') || '[]');
@@ -206,7 +206,7 @@ calculateAverageRating(): void {
   
 
 private getMovieId(film: any): number | undefined {
-  return film?.movieId ?? film?.id; // šta god tvoj API pošalje
+  return film?.movieId ?? film?.id; // šta god API pošalje
 }
 
 private makeIdFromTitle(title: string): number {

@@ -24,7 +24,7 @@ export class AuthService {
     return this.http.patch(
       `${this.base}/users/update`,
       body,
-      { headers: this.buildAuthHeaders() }   // ⬅️ uvijek HttpHeaders
+      { headers: this.buildAuthHeaders() }   // uvek HttpHeaders
     );
   }
 
