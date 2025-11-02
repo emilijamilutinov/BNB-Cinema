@@ -490,4 +490,5 @@ importQuery: string = '';
     for (let i = 0; i < norm.length; i++) h = (h << 5) + h + norm.charCodeAt(i);
     return Math.abs(h);
   }
+  
 }
