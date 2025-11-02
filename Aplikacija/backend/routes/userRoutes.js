@@ -1,8 +1,7 @@
-// backend/routes/userRoutes.js
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
-const db = require('../config/db');              // mysql2/promise pool
-const auth = require('../middlewares/auth');     // JWT -> req.user
+const db = require('../config/db');              
+const auth = require('../middlewares/auth');     
 
 // PATCH /api/user  (menja username/lozinku prijavljenog korisnika)
 router.patch('/', auth, async (req, res) => {

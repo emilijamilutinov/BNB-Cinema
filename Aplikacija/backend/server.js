@@ -122,28 +122,7 @@ app.get("/api/auth/me", auth, (req, res) => {
 
 
 
-// ================== REZERVACIJE ==================
 
-// zauzeta sedišta za (film_title, datum)
-/*app.get("/api/taken-seats", async (req, res) => {
-  const { film_title, datum } = req.query;
-  if (!film_title || !datum) return res.status(400).json({ message: "Parametri?" });
-  try {
-    const [rows] = await pool.execute(
-      `SELECT seat_code FROM taken_seats
-       WHERE film_title = :t AND datum = :d`,
-      { t: film_title, d: datum }
-    );
-    res.json(rows.map(r => r.seat_code));
-  } catch (err) {
-    console.error("taken-seats error:", err);
-    res.status(500).json({ message: "Greška" });
-  }
-});*/
-// GET /api/taken-seats?screening_id=123  (NOVO)
-// ili stari: /api/taken-seats?film_title=...&datum=...
-// zauzeta sedišta (sad podržava screening_id)
-// zauzeta sedišta (po screening_id ili po (film_title, datum))
 // ================== REZERVACIJE ==================
 
 // zauzeta sedišta: prioritet ima screening_id
@@ -177,54 +156,6 @@ app.get('/api/taken-seats', async (req, res) => {
 
 
 
-// KREIRAJ rezervaciju (TRANSACKIJA!)
-/*app.post("/api/rezervacije", auth, async (req, res) => {
-  const { film_title, datum, seats, total } = req.body || {};
-  if (!film_title || !datum || !Array.isArray(seats) || seats.length === 0)
-    return res.status(400).json({ message: "Nedostaju podaci" });
-
-  const email = req.user.email;
-  const username = req.user.username || "Korisnik";
-
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    for (const s of seats) {
-      const seat_code = `${s.row}${s.num}`;
-      await conn.execute(
-        `INSERT INTO taken_seats (film_title, datum, seat_code, email)
-         VALUES (:t, :d, :c, :e)`,
-        { t: film_title, d: datum, c: seat_code, e: email }
-      );
-    }
-
-    const [r] = await conn.execute(
-      `INSERT INTO reservations
-       (username, email, film_title, datum, seats_json, total_eur)
-       VALUES (:u, :e, :t, :d, :sj, :tot)`,
-      {
-        u: username,
-        e: email,
-        t: film_title,
-        d: datum,
-        sj: JSON.stringify(seats),
-        tot: total ?? 0,
-      }
-    );
-
-    await conn.commit();
-    res.status(201).json({ id: r.insertId, ok: true });
-  } catch (err) {
-    try { await conn.rollback(); } catch {}
-    if (err?.code === "ER_DUP_ENTRY")
-      return res.status(409).json({ message: "Neko sedište je zauzeto. Osvežite." });
-    console.error("POST rezervacije error:", err);
-    res.status(500).json({ message: "Greška pri potvrdi", detail: err?.sqlMessage || err?.message });
-  } finally {
-    conn.release();
-  }
-});*/
 app.post("/api/rezervacije", auth, async (req, res) => {
   const { film_title, screening_id, seats, total } = req.body || {};
   if (!film_title || !screening_id || !Array.isArray(seats) || seats.length === 0) {
@@ -291,6 +222,77 @@ app.post("/api/rezervacije", auth, async (req, res) => {
     conn.release();
   }
 });
+
+// POTVRDI rezervaciju + UTORAK popust (-15%)
+app.post('/api/rezervacije/:id/confirm', auth, async (req, res) => {
+  const id = Number(req.params.id);
+  const email = req.user.email;
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1) Učitaj rezervaciju i povezanu projekciju (zaključaj red)
+    const [rows] = await conn.execute(
+      `SELECT r.id, r.email, r.total_eur, r.tuesday_discount_applied,
+              r.screening_id,
+              s.starts_at
+         FROM reservations r
+         LEFT JOIN screenings s ON s.id = r.screening_id
+        WHERE r.id = :id AND r.email = :e
+        FOR UPDATE`,
+      { id, e: email }
+    );
+    if (!rows.length) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Rezervacija nije pronađena' });
+    }
+    const r = rows[0];
+
+    // 2) Da li je projekcija utorkom? (MySQL: Ned=1, Pon=2, Uto=3)
+    const [[{ is_tuesday }]] = await conn.execute(
+      `SELECT DAYOFWEEK(:st) = 3 AS is_tuesday`,
+      { st: r.starts_at }
+    );
+
+    let finalTotal = Number(r.total_eur);
+    let discount = 0;
+    let reason = null;
+
+    if (is_tuesday && !r.tuesday_discount_applied) {
+      discount = +(finalTotal * 0.15).toFixed(2);
+      finalTotal = +(finalTotal - discount).toFixed(2);
+      reason = 'UTORAK_15%';
+
+      await conn.execute(
+        `UPDATE reservations
+            SET total_eur = :tot,
+                discount_amount = :disc,
+                discount_reason = :reason,
+                tuesday_discount_applied = 1
+          WHERE id = :id`,
+        { tot: finalTotal, disc: discount, reason, id }
+      );
+    }
+
+    await conn.commit();
+    return res.json({
+      reservationId: r.id,
+      totalBefore: Number(rows[0].total_eur),
+      totalAfter: finalTotal,
+      discountAmount: discount,
+      discountReason: reason
+    });
+  } catch (err) {
+    try { await conn.rollback(); } catch {}
+    console.error('POST /api/rezervacije/:id/confirm error:', err);
+    return res.status(500).json({ message: 'Greška pri potvrdi rezervacije' });
+  } finally {
+    conn.release();
+  }
+});
+
+
 
 
 
@@ -635,7 +637,7 @@ app.post('/api/films/import', auth, checkRole('owner'), async (req, res) => {
     // 1) pokušaj punog upita
     let list = await searchOnce(q);
 
-    // 2) ako nema, probaj prvu ključnu reč (često pomaže)
+    // 2) ako nema, probaj prvu ključnu reč 
     if (!list) {
       const firstWord = q.split(' ')[0];
       if (firstWord && firstWord.length >= 3) {
