@@ -1,43 +1,61 @@
 // backend/routes/userRoutes.js
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
-const db = require('../config/db'); // koristim zajednički pool (mysql2/promise)
+const db = require('../config/db');              // mysql2/promise pool
+const auth = require('../middlewares/auth');     // JWT -> req.user
 
-// PATCH jer su polja opcionalna
-router.patch('/update', async (req, res) => {
+// PATCH /api/user  (menja username/lozinku prijavljenog korisnika)
+router.patch('/', auth, async (req, res) => {
   try {
-    const { email, username, password } = req.body;
-    if (!email) return res.status(400).json({ message: 'Email je obavezan' });
-
-    const sets = [];
-    const vals = [];
-
-    if (username) {
-      sets.push('username = ?');
-      vals.push(username);
-    }
-    if (password) {
-      const hash = await bcrypt.hash(password, 10);
-      sets.push('password_hash = ?');
-      vals.push(hash);
-    }
-
-    if (!sets.length) {
+    const { username, password } = req.body || {};
+    if (!username && !password) {
       return res.status(400).json({ message: 'Nema polja za ažuriranje' });
     }
 
-    const sql = `UPDATE users SET ${sets.join(', ')} WHERE email = ?`;
-    vals.push(email);
+    const sets = [];
+    const params = { id: req.user.id };
 
-    const [result] = await db.execute(sql, vals);
+    if (username) {
+      const u = String(username).trim();
+      if (!u) return res.status(400).json({ message: 'Neispravno korisničko ime' });
+      sets.push('username = :u');
+      params.u = u;
+    }
+
+    if (password) {
+      if (String(password).length < 6) {
+        return res.status(400).json({ message: 'Lozinka mora imati bar 6 karaktera' });
+      }
+      const hash = await bcrypt.hash(password, 10);
+      sets.push('password_hash = :p');
+      params.p = hash;
+    }
+
+    const sql = `UPDATE users SET ${sets.join(', ')} WHERE id = :id`;
+    const [result] = await db.execute(sql, params);
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Korisnik nije pronađen' });
     }
 
-    res.json({ message: 'Podaci uspešno ažurirani' });
+    // (opciono) izdaj novi token ako se promeni username
+    let token = null;
+    if (username) {
+      const jwt = require('jsonwebtoken');
+      token = jwt.sign(
+        { id: req.user.id, email: req.user.email, username, role: req.user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+    }
+
+    res.json({
+      message: 'Podaci uspešno ažurirani',
+      user: { id: req.user.id, email: req.user.email, username: username ?? req.user.username, role: req.user.role },
+      token
+    });
   } catch (err) {
-    console.error('Update user error:', err);
-    res.status(500).json({ message: 'Greška pri ažuriranju podataka' });
+    console.error('PATCH /api/user error:', err);
+    res.status(500).json({ message: 'Greška pri ažuriranju' });
   }
 });
 

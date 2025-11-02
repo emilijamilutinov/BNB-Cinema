@@ -37,6 +37,22 @@ function auth(req, res, next) {
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
+// --- posle funkcije auth(...) dodaj:
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+// opcioni helper za owner-only rute (koristićeš kad dodaš CRUD za filmove)
+function checkRole(...roles) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ message: 'Nisi prijavljen/a' });
+    if (!roles.includes(req.user.role)) return res.status(403).json({ message: 'Nedovoljna ovlašćenja' });
+    next();
+  };
+}
+
+
 // ===================== AUTH =====================
 //Registracija korisnika
 app.post("/api/auth/signup", async (req, res) => {
@@ -45,12 +61,15 @@ app.post("/api/auth/signup", async (req, res) => {
     return res.status(400).json({ message: "username, email, password su obavezni" });
 
   try {
+    const emailNorm = normalizeEmail(email);
     const hash = await bcrypt.hash(password, 10);
+
     await pool.execute(
       `INSERT INTO users (username, email, password_hash)
        VALUES (:u, :e, :p)`,
-      { u: username, e: email, p: hash }
+      { u: username, e: emailNorm, p: hash }
     );
+    // zadržavam isti response kao ranije (da ne moraš da menjaš FE)
     res.status(201).json({ ok: true });
   } catch (err) {
     if (err?.code === "ER_DUP_ENTRY")
@@ -59,6 +78,7 @@ app.post("/api/auth/signup", async (req, res) => {
     res.status(500).json({ message: "Greška pri registraciji" });
   }
 });
+
 //Prijava korisnika
 
 app.post("/api/auth/login", async (req, res) => {
@@ -67,9 +87,14 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(400).json({ message: "email i password su obavezni" });
 
   try {
+    const emailNorm = normalizeEmail(email);
+
     const [rows] = await pool.execute(
-      `SELECT id, username, email, password_hash FROM users WHERE email = :e`,
-      { e: email }
+      `SELECT id, username, email, password_hash, role
+         FROM users
+        WHERE LOWER(email) = :e
+        LIMIT 1`,
+      { e: emailNorm }
     );
     if (rows.length === 0) return res.status(401).json({ message: "Neispravni kredencijali" });
 
@@ -78,16 +103,24 @@ app.post("/api/auth/login", async (req, res) => {
     if (!ok) return res.status(401).json({ message: "Neispravni kredencijali" });
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, email: user.email },
-      process.env.JWT_SECRET,
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      process.env.JWT_SECRET || "dev_secret_change_me",
       { expiresIn: "7d" }
     );
-    res.json({ token });
+
+    // sada vraćamo i role radi UX-a (guardovi), ali BE već štiti rute preko tokena
+    res.json({ token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
   } catch (err) {
     console.error("login error:", err);
     res.status(500).json({ message: "Greška pri prijavi" });
   }
 });
+app.get("/api/auth/me", auth, (req, res) => {
+  // req.user je payload iz tokena: { id, username, email, role }
+  res.json(req.user);
+});
+
+
 
 // ================== REZERVACIJE ==================
 
@@ -342,6 +375,194 @@ app.patch('/api/user', auth, async (req, res) => {
     res.status(500).json({ message: 'Greška pri ažuriranju' });
   }
 });
+// ================== FILMOVI (lokalna baza + owner CRUD + import) ==================
+
+// Helper: mapiranje eksternog objekta u naš model
+function mapExternalMovieToFilm(ext) {
+  return {
+    title: ext?.title || ext?.name || null,
+    description: ext?.overview || ext?.description || null,
+    director: (ext?.director && (ext.director.name || ext.director)) || ext?.director || null,
+    release_date: (ext?.release_date || ext?.date || ext?.startDate || null)?.slice?.(0, 10) || null,
+    genre: Array.isArray(ext?.genres)
+      ? ext.genres.join(', ')
+      : (Array.isArray(ext?.movieGenres)
+          ? ext.movieGenres.map(g => g?.genre?.name).filter(Boolean).join(', ')
+          : (ext?.genre || null)),
+    runtime_minutes: ext?.runtime || ext?.runtime_minutes || null,
+    poster_url: ext?.poster || ext?.poster_url || null,
+    backdrop_url: ext?.backdrop || ext?.backdrop_url || null,
+  };
+}
+
+// PUBLIC: lista aktivnih filmova
+app.get('/api/films', async (_req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT id,title,description,director,release_date,genre,runtime_minutes,poster_url,backdrop_url,active
+       FROM films
+       WHERE active=1
+       ORDER BY title`
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error('GET /api/films error:', e);
+    res.status(500).json({ message: 'Greška' });
+  }
+});
+
+// PUBLIC: jedan film po ID-u
+app.get('/api/films/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [rows] = await pool.execute(`SELECT * FROM films WHERE id=:id`, { id });
+    if (!rows.length) return res.status(404).json({ message: 'Film nije nađen' });
+    res.json(rows[0]);
+  } catch (e) {
+    console.error('GET /api/films/:id error:', e);
+    res.status(500).json({ message: 'Greška' });
+  }
+});
+
+// OWNER: kreiranje filma ručno
+app.post('/api/films', auth, checkRole('owner'), async (req, res) => {
+  try {
+    const {
+      title, description=null, director=null, release_date=null, genre=null,
+      runtime_minutes=null, poster_url=null, backdrop_url=null, active=1
+    } = req.body || {};
+    if (!title) return res.status(400).json({ message: 'Nedostaje title' });
+
+    const [r] = await pool.execute(
+      `INSERT INTO films
+         (title,description,director,release_date,genre,runtime_minutes,poster_url,backdrop_url,active,is_overridden,last_synced_at)
+       VALUES
+         (:t,:d,:dir,:rd,:g,:rm,:p,:b,:a,1,NOW())`,
+      { t:title, d:description, dir:director, rd:release_date, g:genre, rm:runtime_minutes, p:poster_url, b:backdrop_url, a: active ? 1 : 0 }
+    );
+    res.status(201).json({ id: r.insertId });
+  } catch (e) {
+    console.error('POST /api/films error:', e);
+    res.status(500).json({ message: 'Greška pri kreiranju' });
+  }
+});
+
+// OWNER: izmena
+app.put('/api/films/:id', auth, checkRole('owner'), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const {
+      title=null, description=null, director=null, release_date=null, genre=null,
+      runtime_minutes=null, poster_url=null, backdrop_url=null, active=null
+    } = req.body || {};
+
+    const [r] = await pool.execute(
+      `UPDATE films SET
+         title=COALESCE(:t,title),
+         description=COALESCE(:d,description),
+         director=COALESCE(:dir,director),
+         release_date=COALESCE(:rd,release_date),
+         genre=COALESCE(:g,genre),
+         runtime_minutes=COALESCE(:rm,runtime_minutes),
+         poster_url=COALESCE(:p,poster_url),
+         backdrop_url=COALESCE(:b,backdrop_url),
+         active=COALESCE(:a,active),
+         is_overridden=1
+       WHERE id=:id`,
+      { id, t:title, d:description, dir:director, rd:release_date, g:genre, rm:runtime_minutes, p:poster_url, b:backdrop_url, a:active }
+    );
+    if (!r.affectedRows) return res.status(404).json({ message: 'Film nije nađen' });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('PUT /api/films/:id error:', e);
+    res.status(500).json({ message: 'Greška pri izmeni' });
+  }
+});
+
+// OWNER: brisanje
+app.delete('/api/films/:id', auth, checkRole('owner'), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [r] = await pool.execute(`DELETE FROM films WHERE id=:id`, { id });
+    if (!r.affectedRows) return res.status(404).json({ message: 'Film nije nađen' });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/films/:id error:', e);
+    res.status(500).json({ message: 'Greška pri brisanju' });
+  }
+});
+
+// OWNER: import po nazivu (search preko spoljnog API-ja)
+app.post('/api/films/import', auth, checkRole('owner'), async (req, res) => {
+  try {
+    let q = String(req.body?.query || '').trim();
+    if (!q) return res.status(400).json({ message: 'Nedostaje query' });
+
+    // skini “pametne” navodnike i višak razmaka
+    q = q.replace(/[“”„‟"']/g, '').replace(/\s+/g, ' ').trim();
+
+    const base = process.env.EXT_API_BASE || 'https://movie.pequla.com';
+
+    async function searchOnce(term) {
+      const url = `${base}/api/movie?director=&actor=&search=${encodeURIComponent(term)}&genre=`;
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const list = await r.json().catch(() => null);
+      return (Array.isArray(list) && list.length) ? list : null;
+    }
+
+    // 1) pokušaj punog upita
+    let list = await searchOnce(q);
+
+    // 2) ako nema, probaj prvu ključnu reč (često pomaže)
+    if (!list) {
+      const firstWord = q.split(' ')[0];
+      if (firstWord && firstWord.length >= 3) {
+        list = await searchOnce(firstWord);
+      }
+    }
+
+    if (!list) return res.status(404).json({ message: 'Nije nađen film na spoljnjem API-ju' });
+
+    const ext = list[0];                 // uzmi prvi pogodak
+    const f = mapExternalMovieToFilm(ext);
+    if (!f.title) return res.status(400).json({ message: 'Nedostaje title iz API-ja' });
+
+    const src = process.env.EXT_API_SOURCE || 'pequla';
+    const eid = ext.id ?? ext.movieId ?? f.title; // fallback kada nema ID
+
+    await pool.execute(
+      `INSERT INTO films
+         (title,description,director,release_date,genre,runtime_minutes,poster_url,backdrop_url,
+          active, external_source, external_id, last_synced_at, is_overridden)
+       VALUES
+         (:t,:d,:dir,:rd,:g,:rm,:p,:b, 1, :src, :eid, NOW(), 0)
+       ON DUPLICATE KEY UPDATE
+         title=IF(is_overridden=1,title,VALUES(title)),
+         description=IF(is_overridden=1,description,VALUES(description)),
+         director=IF(is_overridden=1,director,VALUES(director)),
+         release_date=IF(is_overridden=1,release_date,VALUES(release_date)),
+         genre=IF(is_overridden=1,genre,VALUES(genre)),
+         runtime_minutes=IF(is_overridden=1,runtime_minutes,VALUES(runtime_minutes)),
+         poster_url=IF(is_overridden=1,poster_url,VALUES(poster_url)),
+         backdrop_url=IF(is_overridden=1,backdrop_url,VALUES(backdrop_url)),
+         last_synced_at=NOW(), active=1`,
+      { t:f.title, d:f.description, dir:f.director, rd:f.release_date, g:f.genre, rm:f.runtime_minutes,
+        p:f.poster_url, b:f.backdrop_url, src, eid }
+    );
+
+    const [rows] = await pool.execute(
+      `SELECT id FROM films WHERE external_source=:s AND external_id=:e`,
+      { s: src, e: eid }
+    );
+    res.status(201).json({ id: rows[0]?.id, imported: true, title: f.title });
+  } catch (e) {
+    console.error('POST /api/films/import error:', e);
+    res.status(500).json({ message: 'Greška pri importu' });
+  }
+});
+
+
 
 
 // ====== START ======
