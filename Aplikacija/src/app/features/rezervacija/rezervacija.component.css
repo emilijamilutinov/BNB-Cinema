@@ -105,7 +105,8 @@
   text-align: left;
   font-weight: 700;
 }
-.rez-form input {
+.rez-form input,
+.rez-form select {
   padding: 10px 12px;
   border: 2px solid #f5c518;
   border-radius: 8px;
@@ -114,20 +115,36 @@
   font-size: 16px;
   text-align: center;
   transition: 0.2s;
+  appearance: none;              /* modern look for select */
 }
-.rez-form input:focus {
+.rez-form input:focus,
+.rez-form select:focus {
   border-color: #ffcc00;
   background: #222;
   outline: none;
 }
+.rez-form select option {
+  background: #111;
+  color: #f5c518;
+}
+
+/* DODATNO: pomoćni layout za dva polja u redu (ako zatreba) */
+.rez-form .inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* SUMA */
 .total {
-  margin-top: 6px;
+  margin-top: 10px;
   color: #f5c518;
   font-weight: 700;
   text-align: center;
 }
 
-/* DUGME */
+/* DUGME – univerzalno (i kad je van .rez-form) */
+.rezervacija-container button,
 .rez-form button {
   padding: 12px;
   background: linear-gradient(45deg, #ffcc00, #ff6600);
@@ -141,13 +158,29 @@
   transition: all 0.25s ease-in-out;
   box-shadow: 0 4px 8px rgba(255, 204, 0, 0.45);
 }
+.rezervacija-container button:hover,
 .rez-form button:hover {
   background: linear-gradient(45deg, #ff6600, #ffcc00);
   transform: scale(1.03);
   box-shadow: 0 6px 12px rgba(255, 204, 0, 0.6);
 }
+.rezervacija-container button:active,
 .rez-form button:active {
   transform: scale(0.98);
+}
+
+/* BADGE-ovi/čipovi za prikaz izabranog termina (ako prikažeš iznad grida) */
+.screening-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 215, 0, 0.12);
+  color: #ffd700;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  font-weight: 700;
+  margin: 8px 0 2px;
 }
 
 /* RESPONSIVE */
@@ -157,4 +190,5 @@
   .row { grid-template-columns: 30px repeat(8, 1fr); gap: 6px; }
   .seat { padding: 9px 0; }
   .rez-form button { font-size: 14px; padding: 10px; }
+  .rez-form .inline { grid-template-columns: 1fr; }
 }

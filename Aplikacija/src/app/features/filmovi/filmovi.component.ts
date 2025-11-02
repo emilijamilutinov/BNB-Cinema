@@ -30,17 +30,30 @@ export class FilmoviComponent {
 
   isLoggedIn = false;
   username = '';
-  isOwner = false;                   // <— owner guard za UI
+  isOwner = false;
 
-  importQuery = '';  // <- novo polje
-
-  // Admin alatka za import iz eksternog API-ja
-  externalIdToImport = '';
+  // Admin alatke
+  externalIdToImport = ''; // koristimo ga kao ‘query’ (naziv filma)
 
   rezervisaniFilmovi: any[] = [];
   korpa: any[] = [];
 
   private isBrowser = false;
+
+  // Owner editor (termini)
+  editingOpen = false;
+  editingFilm: any = null;
+  editingLocalId: number | null = null;
+  screenings: any[] = [];
+
+  newScreening = {
+    date: '',
+    time: '',
+    hall: 'Sala 1',
+    base_price_std: 4.0,
+    base_price_vip: 6.0,
+    is_active: true,
+  };
 
   constructor(
     private filmoviService: FilmoviService,
@@ -50,38 +63,38 @@ export class FilmoviComponent {
   }
 
   ngOnInit(): void {
-    // status korisnika
     this.updateUserStatus();
 
-    // 1) Čitaj lokalne filmove iz baze (BE: /api/films)
+    // 1) Probaj lokalne filmove
     this.filmoviService.getLocalFilms().subscribe({
       next: (rows) => {
         this.filmovi = rows || [];
         this.filteredFilmovi = this.filmovi;
       },
-      error: (err) => {
-        console.error('Greška pri učitavanju lokalnih filmova:', err);
-        // 2) Fallback – ako backend lista još nije spremna, povuci spoljne (opciono)
+      error: () => {
+        // 2) fallback – spoljni API
         this.loadExternalAsFallback();
       },
     });
 
     this.loadRezervisaniFilmovi();
     this.ucitajKorpu();
+    this.isOwner = this.getRoleFromToken() === 'owner';
   }
 
-  // ======== Fallback na spoljni API (ako želiš) ========
+  // ========== Fallback spoljni API ==========
   private loadExternalAsFallback(): void {
     this.filmoviService.getExternalMovies().subscribe({
       next: (data) => {
         this.filmovi = data || [];
         this.filteredFilmovi = this.filmovi;
       },
-      error: (err) => console.error('Greška pri učitavanju filmova sa spoljnog API-ja:', err),
+      error: (err) =>
+        console.error('Greška pri učitavanju filmova sa spoljnog API-ja:', err),
     });
   }
 
-  // ======== AUTH/ROLE ========
+  // ========== AUTH/ROLE ==========
   private getUsernameFromToken(): string {
     if (!this.isBrowser) return '';
     const token = localStorage.getItem('token');
@@ -94,15 +107,15 @@ export class FilmoviComponent {
     }
   }
 
-  private getRoleFromToken(): string {
-    if (!this.isBrowser) return '';
-    const t = localStorage.getItem('token');
-    if (!t || t.split('.').length < 2) return '';
+  private getRoleFromToken(): string | null {
+    if (!this.isBrowser) return null;
+    const token = localStorage.getItem('token');
+    if (!token || token.split('.').length < 2) return null;
     try {
-      const payload = JSON.parse(atob(t.split('.')[1]));
-      return payload.role || '';
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role || null;
     } catch {
-      return '';
+      return null;
     }
   }
 
@@ -117,54 +130,47 @@ export class FilmoviComponent {
     return this.isBrowser && !!localStorage.getItem('token');
   }
 
-  // ======== MAPE POLJA (rade i za lokalne i za spoljne filmove) ========
-  getTitle(f: any): string {
+  // ========== MAPE POLJA ==========
+  getPoster(f: any) {
+    return f?.poster || f?.poster_url || '';
+  }
+  getTitle(f: any) {
     return f?.title || f?.name || '';
   }
-
-  getPoster(f: any): string {
-    // lokalna baza -> poster_url; spoljni API -> poster
-    return f?.poster_url || f?.poster || '';
-  }
-
-  getDirector(f: any): string {
-    // lokalna baza: director (string)
-    // spoljni API: director.name ili director (string)
+  getDirector(f: any) {
     return f?.director?.name || f?.director || '';
   }
-
-  getYear(f: any): string {
-    // lokalna baza: release_date (YYYY-MM-DD)
-    // spoljni API: startDate ili neko drugo polje datuma
-    const d = f?.release_date || f?.startDate || '';
-    return ('' + d).slice(0, 10);
+  getYear(f: any) {
+    return (f?.startDate || f?.release_date || '').toString().slice(0, 4);
   }
-
-  getGenres(f: any): string {
-    // lokalna baza: genre je CSV string
-    if (typeof f?.genre === 'string' && f.genre.trim()) return f.genre;
-    // spoljni API: movieGenres -> array of { genre: { name } }
+  getGenres(f: any) {
     if (Array.isArray(f?.movieGenres)) {
       return f.movieGenres
         .map((g: any) => g?.genre?.name)
         .filter(Boolean)
         .join(', ');
     }
-    return '';
+    if (Array.isArray(f?.genres)) return f.genres.join(', ');
+    return f?.genre || '';
+  }
+  getDescription(f: any) {
+    return f?.shortDescription || f?.description || f?.overview || '';
   }
 
-  getDescription(f: any): string {
-    return f?.description || f?.shortDescription || f?.overview || '';
-  }
-
-  // ======== UI: filtriranje ========
+  // ========== Filter ==========
   filterMovies(): void {
-    const year = this.searchYear ? new Date(this.searchYear).getFullYear().toString() : '';
+    const year = this.searchYear
+      ? new Date(this.searchYear).getFullYear().toString()
+      : '';
     const genreQ = this.searchGenre.trim().toLowerCase();
 
     this.filteredFilmovi = this.filmovi.filter((f: any) => {
-      const titleOk = this.getTitle(f).toLowerCase().includes(this.searchTitle.toLowerCase());
-      const dirOk = (this.getDirector(f) || '').toLowerCase().includes(this.searchDirector.toLowerCase());
+      const titleOk = this.getTitle(f)
+        .toLowerCase()
+        .includes(this.searchTitle.toLowerCase());
+      const dirOk = (this.getDirector(f) || '')
+        .toLowerCase()
+        .includes(this.searchDirector.toLowerCase());
       const yr = this.getYear(f);
       const yearOk = year ? ('' + yr).includes(year) : true;
       const genres = this.getGenres(f).toLowerCase();
@@ -173,10 +179,11 @@ export class FilmoviComponent {
     });
   }
 
-  // ======== Detalji i recenzije ========
+  // ========== Detalji i recenzije ==========
   openFilmDetails(film: any): void {
     this.selectedFilm = film;
-    const mid = this.getMovieId(film) ?? this.makeIdFromTitle(this.getTitle(film));
+    const mid =
+      this.getMovieId(film) ?? this.makeIdFromTitle(this.getTitle(film));
     this.loadReviews(mid);
     if (this.isBrowser) {
       document.body.classList.add('no-scroll');
@@ -200,12 +207,17 @@ export class FilmoviComponent {
         this.filmReviews = reviews || [];
         this.calculateAverageRating();
       },
-      error: (err) => console.error('Greška pri učitavanju recenzija:', err),
+      error: (err) =>
+        console.error('Greška pri učitavanju recenzija:', err),
     });
 
     this.filmoviService.getAvgRating(movieId).subscribe({
-      next: (x) => { this.averageRating = typeof x?.avg === 'number' ? x.avg : 0; },
-      error: () => { this.averageRating = 0; }
+      next: (x) => {
+        this.averageRating = typeof x?.avg === 'number' ? x.avg : 0;
+      },
+      error: () => {
+        this.averageRating = 0;
+      },
     });
   }
 
@@ -216,11 +228,13 @@ export class FilmoviComponent {
       return;
     }
 
-    const filmId = this.getMovieId(this.selectedFilm) ?? this.makeIdFromTitle(this.getTitle(this.selectedFilm));
+    const filmId =
+      this.getMovieId(this.selectedFilm) ??
+      this.makeIdFromTitle(this.getTitle(this.selectedFilm));
 
     const body = {
       filmId,
-      filmTitle: this.getTitle(this.selectedFilm), // backend proverava po naslovu
+      filmTitle: this.getTitle(this.selectedFilm),
       rating: this.selectedRating,
       comment: this.selectedComment.trim(),
     };
@@ -236,15 +250,23 @@ export class FilmoviComponent {
   }
 
   calculateAverageRating(): void {
-    if (!this.filmReviews?.length) { this.averageRating = 0; return; }
-    const total = this.filmReviews.reduce((s, r) => s + Number(r?.rating || 0), 0);
+    if (!this.filmReviews?.length) {
+      this.averageRating = 0;
+      return;
+    }
+    const total = this.filmReviews.reduce(
+      (s, r) => s + Number(r?.rating || 0),
+      0
+    );
     this.averageRating = total / this.filmReviews.length;
   }
 
-  // ======== Rezervacije (tvoji postojeći localStorage delovi) ========
+  // ========== Rezervacije (localStorage delovi) ==========
   loadRezervisaniFilmovi(): void {
     if (!this.isBrowser) return;
-    this.rezervisaniFilmovi = JSON.parse(localStorage.getItem('rezervisaniFilmovi') || '[]');
+    this.rezervisaniFilmovi = JSON.parse(
+      localStorage.getItem('rezervisaniFilmovi') || '[]'
+    );
   }
 
   otkaziRezervaciju(filmTitle: string): void {
@@ -276,93 +298,187 @@ export class FilmoviComponent {
     this.korpa = JSON.parse(localStorage.getItem('korpa') || '[]');
   }
 
-  // ======== OWNER akcije (import/CRUD preko BE) ========
+  // ========== OWNER: Import i CRUD ==========
   importExternal(): void {
-  const q = (this.importQuery || '').trim();
-  if (!q) { alert('Unesi naslov za import.'); return; }
-
-  this.filmoviService.importByQuery(q).subscribe({
-    next: () => {
-      alert('Film importovan ✅');
-      this.importQuery = '';
-      this.loadFromDb();      // ponovo učitaj listu iz baze
-    },
-    error: (err) => {
-      const msg = err?.error?.message || 'Greška pri importu';
-      alert(msg);
-      console.error('IMPORT error:', err);
+    const query = (this.externalIdToImport || '').trim();
+    if (!query) {
+      alert('Unesi naziv filma za import.');
+      return;
     }
-  });
-}
-
-  addFilm(): void {
-    const title = prompt('Naslov filma:');
-    if (!title) return;
-    this.filmoviService.createFilm({ title, active: 1 }).subscribe({
-      next: () => this.refreshLocalFilms(),
-      error: () => alert('Greška pri kreiranju filma'),
+    this.filmoviService.importFromExternal(query).subscribe({
+      next: () => {
+        alert('Film je importovan u lokalnu bazu. Sada možeš da ga uređuješ.');
+        this.loadFromDb();
+      },
+      error: (err) =>
+        alert(err?.error?.message || 'Greška pri importu filma.'),
     });
   }
 
-  editFilm(film: any) {
-  // TODO: otvori modal i pozovi filmoviService.updateFilm(id, body)
-  console.log('edit', film);
-}
-
-deleteFilm(film: any) {
-  if (!confirm(`Obrisati "${this.getTitle(film)}"?`)) return;
-  this.filmoviService.deleteFilm(film.id).subscribe({
-    next: () => this.loadFromDb(),
-    error: (e) => alert(e?.error?.message || 'Greška pri brisanju')
-  });
-}
-// === Ubaci u FilmoviComponent ===
-
-// poziva se posle importa/brisanja/izmene da ponovo učita listu
-loadFromDb(): void {
-  // 1) pokušaj iz lokalne baze
-  this.filmoviService.getFilms().subscribe({
-    next: (rows) => {
-      this.filmovi = rows || [];
-      this.filteredFilmovi = [...this.filmovi];
-      this.filterMovies(); // zadrži aktivne filtere
-    },
-    error: (e) => {
-      console.warn('Nema lokalnih filmova ili greška, pada fallback na eksterni API.', e);
-      // 2) fallback na spoljni API da UI ne ostane prazan
-      this.filmoviService.getExternalMovies().subscribe({
-        next: (ext) => {
-          this.filmovi = ext || [];
-          this.filteredFilmovi = [...this.filmovi];
-          this.filterMovies();
-        },
-        error: (err2) => {
-          console.error('Greška i na spoljnjem API-ju:', err2);
-          this.filmovi = [];
-          this.filteredFilmovi = [];
-        }
-      });
-    }
-  });
-}
-
-// zgodan alias ako negde već koristiš staro ime
-refreshLocalFilms(): void {
-  this.loadFromDb();
-}
-
-
-
-  /*private refreshLocalFilms(): void {
-    this.filmoviService.getLocalFilms().subscribe({
-      next: (rows) => { this.filmovi = rows || []; this.filteredFilmovi = this.filmovi; },
-      error: (e) => console.error(e),
+  addFilm(): void {
+    const title = prompt('Naslov novog filma:');
+    if (!title) return;
+    this.filmoviService.createFilm({ title, active: 1 }).subscribe({
+      next: () => {
+        alert('Film kreiran u lokalnoj bazi.');
+        this.loadFromDb();
+      },
+      error: (err) =>
+        alert(err?.error?.message || 'Greška pri kreiranju filma.'),
     });
-  }*/
+  }
 
-  // ======== ID helperi ========
+  // ========== OWNER: Editor termina ==========
+  editFilm(film: any): void {
+    this.editingFilm = film;
+    this.editingLocalId = null;
+    this.screenings = [];
+    this.editingOpen = true;
+
+    this.filmoviService.getLocalFilms().subscribe({
+      next: (locals) => {
+        const title = (this.getTitle(film) || '').trim().toLowerCase();
+        const found = (locals || []).find(
+          (x: any) => (x?.title || '').trim().toLowerCase() === title
+        );
+        if (!found) {
+          alert(
+            'Ovaj film još nije uvezen u lokalnu bazu. Klikni "Importuj iz API-ja" pa probaj ponovo.'
+          );
+          return;
+        }
+        this.editingLocalId = found.id;
+        this.loadScreenings();
+      },
+      error: () => alert('Greška pri učitavanju lokalnih filmova.'),
+    });
+  }
+
+  closeEditor(): void {
+    this.editingOpen = false;
+    this.editingFilm = null;
+    this.editingLocalId = null;
+    this.screenings = [];
+    this.newScreening = {
+      date: '',
+      time: '',
+      hall: 'Sala 1',
+      base_price_std: 4.0,
+      base_price_vip: 6.0,
+      is_active: true,
+    };
+  }
+
+  loadScreenings(): void {
+    if (!this.editingLocalId) return;
+    this.filmoviService.getScreenings(this.editingLocalId).subscribe({
+      next: (rows) => (this.screenings = rows || []),
+      error: () => (this.screenings = []),
+    });
+  }
+
+  saveScreening(): void {
+    if (!this.editingLocalId) return;
+    if (!this.newScreening.date || !this.newScreening.time) {
+      alert('Unesi datum i vreme.');
+      return;
+    }
+    const starts_at = `${this.newScreening.date} ${this.newScreening.time}:00`;
+    this.filmoviService
+      .createScreening(this.editingLocalId, {
+        starts_at,
+        hall: this.newScreening.hall || 'Sala 1',
+        base_price_std: Number(this.newScreening.base_price_std) || 4.0,
+        base_price_vip: Number(this.newScreening.base_price_vip) || 6.0,
+        is_active: this.newScreening.is_active ? 1 : 0,
+      })
+      .subscribe({
+        next: () => {
+          this.newScreening.time = '';
+          this.loadScreenings();
+        },
+        error: (err) =>
+          alert(err?.error?.message || 'Greška pri čuvanju termina.'),
+      });
+  }
+
+  removeScreening(id: number): void {
+    if (!confirm('Obriši ovaj termin?')) return;
+    this.filmoviService.deleteScreening(id).subscribe({
+      next: () => this.loadScreenings(),
+      error: () => alert('Greška pri brisanju termina.'),
+    });
+  }
+  // === OWNER: brisanje filma iz lokalne baze (dugme "Obriši") ===
+deleteFilm(film: any): void {
+  if (!this.isOwner) { alert('Samo vlasnik može da briše filmove.'); return; }
+
+  const title = (this.getTitle(film) || '').trim().toLowerCase();
+  if (!title) { alert('Nepoznat naslov.'); return; }
+
+  if (!confirm(`Obriši film "${this.getTitle(film)}" iz lokalne baze?`)) return;
+
+  // Najpre pronađi lokalni zapis kako bismo imali ID
+  this.filmoviService.getLocalFilms().subscribe({
+    next: (locals) => {
+      const found = (locals || []).find((x: any) =>
+        (x?.title || '').trim().toLowerCase() === title
+      );
+      if (!found) {
+        alert('Ovaj film nije u lokalnoj bazi (uvezi ga pre brisanja).');
+        return;
+      }
+
+      this.filmoviService.deleteFilm(found.id).subscribe({
+        next: () => {
+          alert('Film obrisan.');
+          this.loadFromDb(); // osveži listu
+        },
+        error: (err) => alert(err?.error?.message || 'Greška pri brisanju filma.')
+      });
+    },
+    error: () => alert('Greška pri čitanju lokalnih filmova.')
+  });
+}
+// field for the input bound with [(ngModel)]="importQuery"
+importQuery: string = '';
+
+// called by (click)="importExternal()"
+
+
+
+
+  // Pozovi posle importa/brisanja/izmene da refrešuje listu
+  loadFromDb(): void {
+    this.filmoviService.getLocalFilms().subscribe({
+      next: (rows) => {
+        this.filmovi = rows || [];
+        this.filteredFilmovi = [...this.filmovi];
+        this.filterMovies();
+      },
+      error: (e) => {
+        console.warn(
+          'Nema lokalnih filmova ili greška, pada fallback na eksterni API.',
+          e
+        );
+        this.filmoviService.getExternalMovies().subscribe({
+          next: (ext) => {
+            this.filmovi = ext || [];
+            this.filteredFilmovi = [...this.filmovi];
+            this.filterMovies();
+          },
+          error: (err2) => {
+            console.error('Greška i na spoljnjem API-ju:', err2);
+            this.filmovi = [];
+            this.filteredFilmovi = [];
+          },
+        });
+      },
+    });
+  }
+
+  // ========== ID helperi ==========
   private getMovieId(film: any): number | undefined {
-    // lokalna baza nema tmdbId — koristi id (lokalni) ili hash naslova kao fallback
     return film?.movieId ?? film?.id;
   }
 
@@ -370,10 +486,13 @@ refreshLocalFilms(): void {
     const norm = (title || '')
       .toLowerCase()
       .replace(/["'’‘“”\-\.\,\:\;\(\)\[\]\{\}\s]/g, '')
-      .replace(/č/g,'c').replace(/ć/g,'c').replace(/š/g,'s').replace(/ž/g,'z').replace(/đ/g,'dj');
-    // jednostavan deterministički hash (djb2)
+      .replace(/č/g, 'c')
+      .replace(/ć/g, 'c')
+      .replace(/š/g, 's')
+      .replace(/ž/g, 'z')
+      .replace(/đ/g, 'dj');
     let h = 5381;
-    for (let i = 0; i < norm.length; i++) h = ((h << 5) + h) + norm.charCodeAt(i);
+    for (let i = 0; i < norm.length; i++) h = (h << 5) + h + norm.charCodeAt(i);
     return Math.abs(h);
   }
 }

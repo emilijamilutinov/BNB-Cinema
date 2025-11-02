@@ -20,6 +20,7 @@
     <input type="text" class="search-bar" placeholder="Pretraži po žanru..." [(ngModel)]="searchGenre" (input)="filterMovies()">
     <input type="date" class="search-bar" [(ngModel)]="searchYear" (change)="filterMovies()" max="9999-12-31">
   </div>
+  
 
   <!-- LISTA FILMOVA -->
   <div class="svifilmovi">
@@ -63,6 +64,64 @@
       </div>
     </div>
   </div>
+  <!-- ======= EDITOR TERMINA (vidi ga samo owner) ======= -->
+<div class="modal" *ngIf="editingOpen" (click)="closeEditor()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <button class="close" (click)="closeEditor()">×</button>
+
+    <h2 style="margin-top:0">Uredi termine – {{ getTitle(editingFilm) }}</h2>
+    <div *ngIf="!editingLocalId" style="color:#f5c518; margin:8px 0;">
+      Ovaj film nije u lokalnoj bazi. Klikni “Importuj iz API-ja”, pa pokušaj ponovo.
+    </div>
+
+    <div *ngIf="editingLocalId">
+      <!-- Postojeći termini -->
+      <h3>Postojeći termini</h3>
+      <div *ngIf="screenings.length === 0" style="color:#aaa">Još nema termina.</div>
+      <ul class="screening-list" *ngIf="screenings.length > 0">
+        <li *ngFor="let s of screenings">
+          <span>
+            {{ s.starts_at }} — {{ s.hall || 'Sala' }}
+            | Std: {{ s.base_price_std }}€ | VIP: {{ s.base_price_vip }}€
+            | {{ s.is_active ? 'Aktivan' : 'Neaktivan' }}
+          </span>
+          <button class="btn-danger" (click)="removeScreening(s.id)">Obriši</button>
+        </li>
+      </ul>
+
+      <hr>
+
+      <!-- Novi termin -->
+      <h3>Novi termin</h3>
+      <form class="editor-grid">
+        <label>Datum
+          <input type="date" [(ngModel)]="newScreening.date" name="ns_date">
+        </label>
+        <label>Vreme
+          <input type="time" [(ngModel)]="newScreening.time" name="ns_time">
+        </label>
+        <label>Sala
+          <input type="text" [(ngModel)]="newScreening.hall" name="ns_hall">
+        </label>
+        <label>Standard €
+          <input type="number" step="0.01" [(ngModel)]="newScreening.base_price_std" name="ns_std">
+        </label>
+        <label>VIP €
+          <input type="number" step="0.01" [(ngModel)]="newScreening.base_price_vip" name="ns_vip">
+        </label>
+        <label>Aktivan
+          <select [(ngModel)]="newScreening.is_active" name="ns_active">
+            <option [ngValue]="true">Da</option>
+            <option [ngValue]="false">Ne</option>
+          </select>
+        </label>
+      </form>
+
+      <button class="btn-primary" (click)="saveScreening()">Sačuvaj termin</button>
+    </div>
+  </div>
+</div>
+
 
   <!-- MOJE REZERVACIJE -->
   <div *ngIf="rezervisaniFilmovi.length > 0" class="rezervisani-container">

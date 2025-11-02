@@ -125,7 +125,7 @@ app.get("/api/auth/me", auth, (req, res) => {
 // ================== REZERVACIJE ==================
 
 // zauzeta sedišta za (film_title, datum)
-app.get("/api/taken-seats", async (req, res) => {
+/*app.get("/api/taken-seats", async (req, res) => {
   const { film_title, datum } = req.query;
   if (!film_title || !datum) return res.status(400).json({ message: "Parametri?" });
   try {
@@ -139,10 +139,40 @@ app.get("/api/taken-seats", async (req, res) => {
     console.error("taken-seats error:", err);
     res.status(500).json({ message: "Greška" });
   }
+});*/
+// GET /api/taken-seats?screening_id=123  (NOVO)
+// ili stari: /api/taken-seats?film_title=...&datum=...
+// zauzeta sedišta (sad podržava screening_id)
+app.get("/api/taken-seats", async (req, res) => {
+  const sid = req.query.screening_id ? Number(req.query.screening_id) : null;
+  const { film_title, datum } = req.query;
+
+  try {
+    let rows;
+    if (sid) {
+      [rows] = await pool.execute(
+        `SELECT seat_code FROM taken_seats WHERE screening_id = :sid`,
+        { sid }
+      );
+    } else {
+      if (!film_title || !datum)
+        return res.status(400).json({ message: "Parametri?" });
+      [rows] = await pool.execute(
+        `SELECT seat_code FROM taken_seats WHERE film_title = :t AND datum = :d`,
+        { t: film_title, d: datum }
+      );
+    }
+    res.json(rows.map(r => r.seat_code));
+  } catch (err) {
+    console.error("taken-seats error:", err);
+    res.status(500).json({ message: "Greška" });
+  }
 });
 
+
+
 // KREIRAJ rezervaciju (TRANSACKIJA!)
-app.post("/api/rezervacije", auth, async (req, res) => {
+/*app.post("/api/rezervacije", auth, async (req, res) => {
   const { film_title, datum, seats, total } = req.body || {};
   if (!film_title || !datum || !Array.isArray(seats) || seats.length === 0)
     return res.status(400).json({ message: "Nedostaju podaci" });
@@ -188,7 +218,59 @@ app.post("/api/rezervacije", auth, async (req, res) => {
   } finally {
     conn.release();
   }
+});*/
+app.post("/api/rezervacije", auth, async (req, res) => {
+  const { film_title, datum, seats, total, screening_id } = req.body || {};
+  if ((!screening_id && (!film_title || !datum)) || !Array.isArray(seats) || seats.length === 0) {
+    return res.status(400).json({ message: "Nedostaju podaci" });
+  }
+
+  const email = req.user.email;
+  const username = req.user.username || "Korisnik";
+  const sid = screening_id ? Number(screening_id) : null;
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    for (const s of seats) {
+      const seat_code = `${s.row}${s.num}`;
+      await conn.execute(
+        `INSERT INTO taken_seats (film_title, datum, seat_code, email, screening_id)
+         VALUES (:t, :d, :c, :e, :sid)`,
+        { t: film_title ?? null, d: datum ?? null, c: seat_code, e: email, sid }
+      );
+    }
+
+    const [r] = await conn.execute(
+      `INSERT INTO reservations
+       (username, email, film_title, datum, screening_id, seats_json, total_eur)
+       VALUES (:u, :e, :t, :d, :sid, :sj, :tot)`,
+      {
+        u: username,
+        e: email,
+        t: film_title ?? null,
+        d: datum ?? null,
+        sid,
+        sj: JSON.stringify(seats),
+        tot: total ?? 0,
+      }
+    );
+
+    await conn.commit();
+    res.status(201).json({ id: r.insertId, ok: true });
+  } catch (err) {
+    try { await conn.rollback(); } catch {}
+    if (err?.code === "ER_DUP_ENTRY")
+      return res.status(409).json({ message: "Neko sedište je zauzeto. Osvežite." });
+    console.error("POST rezervacije error:", err);
+    res.status(500).json({ message: "Greška pri potvrdi", detail: err?.sqlMessage || err?.message });
+  } finally {
+    conn.release();
+  }
 });
+
+
 
 // moje rezervacije
 app.get("/api/rezervacije", auth, async (req, res) => {
@@ -559,6 +641,51 @@ app.post('/api/films/import', auth, checkRole('owner'), async (req, res) => {
   } catch (e) {
     console.error('POST /api/films/import error:', e);
     res.status(500).json({ message: 'Greška pri importu' });
+  }
+});
+// PUBLIC: sve projekcije za film
+app.get('/api/films/:filmId/screenings', async (req, res) => {
+  try {
+    const filmId = Number(req.params.filmId);
+    const [rows] = await pool.execute(
+      `SELECT id, film_id, starts_at, hall, base_price_std, base_price_vip, is_active
+         FROM screenings
+        WHERE film_id=:fid AND is_active=1
+        ORDER BY starts_at ASC`,
+      { fid: filmId }
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error('GET /api/films/:filmId/screenings error:', e);
+    res.status(500).json({ message: 'Greška' });
+  }
+});
+// OWNER: dodaj projekciju
+app.post('/api/films/:filmId/screenings', auth, checkRole('owner'), async (req, res) => {
+  try {
+    const filmId = Number(req.params.filmId);
+    const {
+      starts_at,               // "2025-11-05 19:30:00"
+      hall = 'Sala 1',
+      base_price_std = 4.00,
+      base_price_vip = 6.00,
+      is_active = 1
+    } = req.body || {};
+
+    if (!starts_at) return res.status(400).json({ message: 'Nedostaje starts_at' });
+
+    const [r] = await pool.execute(
+      `INSERT INTO screenings
+         (film_id, starts_at, hall, base_price_std, base_price_vip, is_active)
+       VALUES
+         (:fid, :st, :h, :ps, :pv, :a)`,
+      { fid: filmId, st: starts_at, h: hall, ps: base_price_std, pv: base_price_vip, a: is_active ? 1 : 0 }
+    );
+
+    res.status(201).json({ id: r.insertId });
+  } catch (e) {
+    console.error('POST /api/films/:filmId/screenings error:', e);
+    res.status(500).json({ message: 'Greška pri kreiranju projekcije' });
   }
 });
 

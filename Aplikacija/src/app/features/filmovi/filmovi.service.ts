@@ -128,7 +128,7 @@ export class FilmoviService {
   importByQuery(query: string): Observable<any> {
     return this.http.post(
       `${this.apiBase}/films/import`,
-      { query },                           // ⬅ ključ MORA biti "query"
+      { query }, // ključ MORA biti "query"
       { headers: this.authHeaders() }
     ).pipe(
       tap(() => console.log('Film importovan iz spoljnog API-ja')),
@@ -138,6 +138,11 @@ export class FilmoviService {
         return throwError(() => new Error(msg));
       })
     );
+  }
+
+  /** Alias da komponenta može da zove importFromExternal(...) */
+  importFromExternal(query: string): Observable<any> {
+    return this.importByQuery(query);
   }
 
   // ==========================
@@ -191,6 +196,59 @@ export class FilmoviService {
         return throwError(() => new Error(msg));
       })
     );
+  }
+
+  // ==========================
+  // SCREENINGS (termini projekcija)
+  // ==========================
+  getScreenings(filmId: number) {
+    return this.http.get<any[]>(`${this.apiBase}/films/${filmId}/screenings`);
+  }
+
+  createScreening(
+    filmId: number,
+    body: {
+      starts_at: string; // "YYYY-MM-DD HH:mm:ss"
+      hall?: string;
+      base_price_std?: number;
+      base_price_vip?: number;
+      is_active?: boolean | 0 | 1;
+    }
+  ) {
+    return this.http.post(
+      `${this.apiBase}/films/${filmId}/screenings`,
+      body,
+      { headers: this.authHeaders() }
+    );
+  }
+
+  updateScreening(
+    id: number,
+    body: Partial<{
+      starts_at: string;
+      hall: string;
+      base_price_std: number;
+      base_price_vip: number;
+      is_active: boolean | 0 | 1;
+    }>
+  ) {
+    return this.http.put(
+      `${this.apiBase}/screenings/${id}`,
+      body,
+      { headers: this.authHeaders() }
+    );
+  }
+
+  deleteScreening(id: number) {
+    return this.http.delete(
+      `${this.apiBase}/screenings/${id}`,
+      { headers: this.authHeaders() }
+    );
+  }
+
+  getTakenSeatsByScreening(screeningId: number) {
+    const params = new HttpParams().set('screening_id', screeningId);
+    return this.http.get<string[]>(`${this.apiBase}/taken-seats`, { params });
   }
 
   // ==========================
