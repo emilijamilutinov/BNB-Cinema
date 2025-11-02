@@ -109,12 +109,7 @@
         <label>VIP €
           <input type="number" step="0.01" [(ngModel)]="newScreening.base_price_vip" name="ns_vip">
         </label>
-        <label>Aktivan
-          <select [(ngModel)]="newScreening.is_active" name="ns_active">
-            <option [ngValue]="true">Da</option>
-            <option [ngValue]="false">Ne</option>
-          </select>
-        </label>
+        
       </form>
 
       <button class="btn-primary" (click)="saveScreening()">Sačuvaj termin</button>
