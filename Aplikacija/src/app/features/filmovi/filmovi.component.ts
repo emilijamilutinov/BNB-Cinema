@@ -310,7 +310,7 @@ export class FilmoviComponent {
 
 
 
-  addFilm(): void {
+  /*addFilm(): void {
     const title = prompt('Naslov novog filma:');
     if (!title) return;
     this.filmoviService.createFilm({ title, active: 1 }).subscribe({
@@ -321,7 +321,7 @@ export class FilmoviComponent {
       error: (err) =>
         alert(err?.error?.message || 'Greška pri kreiranju filma.'),
     });
-  }
+  }*/
 
   // ========== OWNER: Editor termina ==========
   editFilm(film: any): void {
@@ -437,10 +437,6 @@ deleteFilm(film: any): void {
 }
 // field for the input bound with [(ngModel)]="importQuery"
 importQuery: string = '';
-
-// called by (click)="importExternal()"
-
-
 
 
   // Pozovi posle importa/brisanja/izmene da refrešuje listu

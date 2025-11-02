@@ -68,29 +68,6 @@ export class FilmoviService {
     );
   }
 
-  /** Kreiranje filma (samo owner) */
-  createFilm(body: {
-    title: string;
-    description?: string | null;
-    director?: string | null;
-    release_date?: string | null;     // 'YYYY-MM-DD'
-    genre?: string | null;            // npr. "Drama, Akcija"
-    runtime_minutes?: number | null;
-    poster_url?: string | null;
-    backdrop_url?: string | null;
-    active?: 0 | 1 | boolean;
-  }): Observable<any> {
-    return this.http.post(`${this.apiBase}/films`, body, {
-      headers: this.authHeaders()
-    }).pipe(
-      tap(() => console.log('Film kreiran')),
-      catchError(err => {
-        console.error('Greška pri kreiranju filma:', err);
-        const msg = err?.error?.message || 'Greška pri kreiranju filma';
-        return throwError(() => new Error(msg));
-      })
-    );
-  }
 
   /** Izmena filma (samo owner) */
   updateFilm(id: number, body: Partial<{
@@ -187,24 +164,7 @@ export class FilmoviService {
     );
   }
 
-  /** Potvrda rezervacije (čuva u bazi; autorizovano) */
-  /*postRezervacija(body: {
-    film_title: string;
-    datum: string;
-    seats: { row: string; num: number }[];
-    total: number; // ili 0 ako se računa na serveru
-  }): Observable<any> {
-    return this.http.post(`${this.apiBase}/rezervacije`, body, {
-      headers: this.authHeaders()
-    }).pipe(
-      tap(() => console.log('Rezervacija sačuvana')),
-      catchError(err => {
-        console.error('Greška pri slanju rezervacije:', err);
-        const msg = err?.error?.message || 'Greška pri slanju rezervacije';
-        return throwError(() => new Error(msg));
-      })
-    );
-  }*/
+  
  postRezervacija(body: RezervacijaPayload): Observable<any> {
   return this.http.post(`${this.apiBase}/rezervacije`, body, {
     headers: this.authHeaders()

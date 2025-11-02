@@ -1,4 +1,4 @@
-// backend/controllers/authController.js
+
 const db = require('../config/db');   // mysql2/promise pool
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
@@ -102,6 +102,6 @@ exports.login = async (req, res) => {
 };
 
 exports.logout = (_req, res) => {
-  // stateless JWT – "logout" je na klijentu (brisanje tokena iz storage-a)
+  
   res.json({ message: 'Uspešno ste se odjavili' });
 };
