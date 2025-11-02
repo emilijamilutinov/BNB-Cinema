@@ -70,21 +70,25 @@ body {
   font-size: 12px;
 }
 .reservations {
-  width: 65%;
+  width: 72%;
   text-align: center;
 }
 
 .table-container {
   padding: 10px;
+  overflow-x: auto;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 th, td {
   border: 1px solid #f5c518;
   padding: 10px;
   text-align: center;
+  white-space: nowrap;
 }
+

@@ -143,29 +143,35 @@ app.get("/api/auth/me", auth, (req, res) => {
 // GET /api/taken-seats?screening_id=123  (NOVO)
 // ili stari: /api/taken-seats?film_title=...&datum=...
 // zauzeta sedišta (sad podržava screening_id)
-app.get("/api/taken-seats", async (req, res) => {
-  const sid = req.query.screening_id ? Number(req.query.screening_id) : null;
-  const { film_title, datum } = req.query;
+// zauzeta sedišta (po screening_id ili po (film_title, datum))
+// ================== REZERVACIJE ==================
+
+// zauzeta sedišta: prioritet ima screening_id
+app.get('/api/taken-seats', async (req, res) => {
+  const { screening_id, film_title, datum } = req.query;
 
   try {
-    let rows;
-    if (sid) {
-      [rows] = await pool.execute(
+    if (screening_id) {
+      const [rows] = await pool.execute(
         `SELECT seat_code FROM taken_seats WHERE screening_id = :sid`,
-        { sid }
+        { sid: Number(screening_id) }
       );
-    } else {
-      if (!film_title || !datum)
-        return res.status(400).json({ message: "Parametri?" });
-      [rows] = await pool.execute(
-        `SELECT seat_code FROM taken_seats WHERE film_title = :t AND datum = :d`,
-        { t: film_title, d: datum }
-      );
+      return res.json(rows.map(r => r.seat_code));
     }
+
+    // fallback po starom (film_title + datum)
+    if (!film_title || !datum) {
+      return res.status(400).json({ message: 'Parametri?' });
+    }
+    const [rows] = await pool.execute(
+      `SELECT seat_code FROM taken_seats
+       WHERE film_title = :t AND datum = :d`,
+      { t: film_title, d: datum }
+    );
     res.json(rows.map(r => r.seat_code));
   } catch (err) {
-    console.error("taken-seats error:", err);
-    res.status(500).json({ message: "Greška" });
+    console.error('taken-seats error:', err);
+    res.status(500).json({ message: 'Greška' });
   }
 });
 
@@ -220,40 +226,55 @@ app.get("/api/taken-seats", async (req, res) => {
   }
 });*/
 app.post("/api/rezervacije", auth, async (req, res) => {
-  const { film_title, datum, seats, total, screening_id } = req.body || {};
-  if ((!screening_id && (!film_title || !datum)) || !Array.isArray(seats) || seats.length === 0) {
-    return res.status(400).json({ message: "Nedostaju podaci" });
+  const { film_title, screening_id, seats, total } = req.body || {};
+  if (!film_title || !screening_id || !Array.isArray(seats) || seats.length === 0) {
+    return res.status(400).json({ message: "Nedostaju podaci (film_title, screening_id, seats)" });
   }
 
   const email = req.user.email;
   const username = req.user.username || "Korisnik";
-  const sid = screening_id ? Number(screening_id) : null;
 
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
 
+    // 1) Učitaj projekciju
+    const [scRows] = await conn.execute(
+      `SELECT id, starts_at, hall FROM screenings WHERE id = :sid AND is_active = 1`,
+      { sid: screening_id }
+    );
+    if (!scRows.length) {
+      await conn.rollback();
+      return res.status(400).json({ message: "Projekcija ne postoji ili je neaktivna." });
+    }
+    const sc = scRows[0];
+    // Izračunaj datum iz starts_at
+    const datum = new Date(sc.starts_at).toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+    // 2) Upis zauzetih sedišta (uz screening_id)
     for (const s of seats) {
       const seat_code = `${s.row}${s.num}`;
       await conn.execute(
         `INSERT INTO taken_seats (film_title, datum, seat_code, email, screening_id)
          VALUES (:t, :d, :c, :e, :sid)`,
-        { t: film_title ?? null, d: datum ?? null, c: seat_code, e: email, sid }
+        { t: film_title, d: datum, c: seat_code, e: email, sid: screening_id }
       );
     }
 
+    // 3) Upis rezervacije (sa screening_id + datum)
     const [r] = await conn.execute(
       `INSERT INTO reservations
-       (username, email, film_title, datum, screening_id, seats_json, total_eur)
-       VALUES (:u, :e, :t, :d, :sid, :sj, :tot)`,
+         (username, email, film_title, datum, seats_json, total_eur, screening_id)
+       VALUES
+         (:u, :e, :t, :d, :sj, :tot, :sid)`,
       {
         u: username,
         e: email,
-        t: film_title ?? null,
-        d: datum ?? null,
-        sid,
+        t: film_title,
+        d: datum,
         sj: JSON.stringify(seats),
         tot: total ?? 0,
+        sid: screening_id
       }
     );
 
@@ -261,8 +282,9 @@ app.post("/api/rezervacije", auth, async (req, res) => {
     res.status(201).json({ id: r.insertId, ok: true });
   } catch (err) {
     try { await conn.rollback(); } catch {}
-    if (err?.code === "ER_DUP_ENTRY")
+    if (err?.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ message: "Neko sedište je zauzeto. Osvežite." });
+    }
     console.error("POST rezervacije error:", err);
     res.status(500).json({ message: "Greška pri potvrdi", detail: err?.sqlMessage || err?.message });
   } finally {
@@ -272,22 +294,39 @@ app.post("/api/rezervacije", auth, async (req, res) => {
 
 
 
-// moje rezervacije
+
+// moje rezervacije (sa salom i vremenom)
+// moje rezervacije (+ JOIN na screenings za salu i vreme)
 app.get("/api/rezervacije", auth, async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT id, film_title, datum, seats_json, total_eur, created_at
-       FROM reservations
-       WHERE email = :e
-       ORDER BY created_at DESC`,
+      `SELECT
+         r.id,
+         r.film_title,
+         r.seats_json,
+         r.total_eur,
+         r.created_at,
+         r.screening_id,
+
+         s.hall,
+         s.starts_at,
+
+         DATE(s.starts_at)                      AS starts_date,
+         DATE_FORMAT(s.starts_at, '%H:%i')      AS starts_time
+       FROM reservations r
+       LEFT JOIN screenings s ON s.id = r.screening_id
+       WHERE r.email = :e
+       ORDER BY r.created_at DESC`,
       { e: req.user.email }
     );
+
     res.json(rows);
   } catch (err) {
     console.error("GET rezervacije error:", err);
     res.status(500).json({ message: "Greška pri čitanju" });
   }
 });
+
 
 // otkazivanje
 app.delete("/api/rezervacije/:id", auth, async (req, res) => {
@@ -688,6 +727,88 @@ app.post('/api/films/:filmId/screenings', auth, checkRole('owner'), async (req, 
     res.status(500).json({ message: 'Greška pri kreiranju projekcije' });
   }
 });
+// ======= SCREENINGS (projekcije) =======
+
+// sve projekcije za film
+app.get('/api/films/:filmId/screenings', async (req, res) => {
+  try {
+    const filmId = Number(req.params.filmId);
+    const [rows] = await pool.execute(
+      `SELECT id, film_id, starts_at, hall, base_price_std, base_price_vip, is_active
+       FROM screenings
+       WHERE film_id = :fid
+       ORDER BY starts_at`, { fid: filmId }
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error('GET screenings error:', e);
+    res.status(500).json({ message: 'Greška' });
+  }
+});
+
+// kreiraj projekciju (samo owner)
+app.post('/api/films/:filmId/screenings', auth, checkRole('owner'), async (req, res) => {
+  try {
+    const filmId = Number(req.params.filmId);
+    const {
+      starts_at,             // "YYYY-MM-DD HH:mm:ss"
+      hall = 'Sala 1',
+      base_price_std = 4.00,
+      base_price_vip = 6.00,
+      is_active = 1
+    } = req.body || {};
+
+    if (!starts_at) return res.status(400).json({ message: 'Nedostaje starts_at' });
+
+    const [r] = await pool.execute(
+      `INSERT INTO screenings (film_id, starts_at, hall, base_price_std, base_price_vip, is_active)
+       VALUES (:fid, :st, :h, :ps, :pv, :ia)`,
+      { fid: filmId, st: starts_at, h: hall, ps: base_price_std, pv: base_price_vip, ia: is_active ? 1 : 0 }
+    );
+    res.status(201).json({ id: r.insertId });
+  } catch (e) {
+    console.error('POST screenings error:', e);
+    res.status(500).json({ message: 'Greška pri kreiranju projekcije' });
+  }
+});
+
+// izmeni projekciju (samo owner)
+app.put('/api/screenings/:id', auth, checkRole('owner'), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { starts_at=null, hall=null, base_price_std=null, base_price_vip=null, is_active=null } = req.body || {};
+
+    const [r] = await pool.execute(
+      `UPDATE screenings SET
+          starts_at       = COALESCE(:st, starts_at),
+          hall            = COALESCE(:h, hall),
+          base_price_std  = COALESCE(:ps, base_price_std),
+          base_price_vip  = COALESCE(:pv, base_price_vip),
+          is_active       = COALESCE(:ia, is_active)
+        WHERE id = :id`,
+      { id, st: starts_at, h: hall, ps: base_price_std, pv: base_price_vip, ia: is_active }
+    );
+    if (!r.affectedRows) return res.status(404).json({ message: 'Projekcija nije nađena' });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('PUT screenings error:', e);
+    res.status(500).json({ message: 'Greška pri izmeni projekcije' });
+  }
+});
+
+// obriši projekciju (samo owner)
+app.delete('/api/screenings/:id', auth, checkRole('owner'), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    // opciono: obriši i zauzeta sedišta/rezervacije za ovaj screening ako koristiš isključivo screening_id
+    await pool.execute(`DELETE FROM screenings WHERE id = :id`, { id });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE screenings error:', e);
+    res.status(500).json({ message: 'Greška pri brisanju projekcije' });
+  }
+});
+
 
 
 

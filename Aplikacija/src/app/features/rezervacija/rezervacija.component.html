@@ -11,17 +11,21 @@
 
   <!-- TERMINI -->
   <!-- IZBOR TERMINA -->
-<div class="rez-form" style="margin-bottom:10px">
+<div class="rez-form">
   <label>
     Izaberite termin:
-    <select [(ngModel)]="selectedScreeningId" name="scr" (change)="onPickScreening()">
-      <option [ngValue]="null" disabled>— Izaberite —</option>
-      <option *ngFor="let s of screenings" [ngValue]="s.id">
-        {{ s.starts_at | date:'dd.MM.yyyy HH:mm' }} — {{ s.hall || 'Sala 1' }}
+    <select [(ngModel)]="selectedScreeningId" name="screening"
+            (ngModelChange)="onPickScreening($event)">
+      <option [ngValue]="null" disabled>— odaberite —</option>
+      <option *ngFor="let sc of screenings" [ngValue]="sc.id">
+        {{ sc.starts_at | date:'dd.MM.yyyy HH:mm' }} — {{ sc.hall || 'Sala' }}
       </option>
     </select>
   </label>
 </div>
+
+
+
 
 <!-- Poruka iznad mreže -->
 <div *ngIf="!selectedScreeningId" style="color:#f5c518; margin:10px 0;">
@@ -30,7 +34,7 @@
 
 <!-- GRID SEDIŠTA: vidi se tek nakon izbora termina -->
 <div class="seats-grid" *ngIf="selectedScreeningId" role="grid" aria-label="Izbor sedišta">
-  <!-- ... tvoja postojeća mreža sedišta ostaje ista ... -->
+  <!-- ... postojeća mreža sedišta ostaje ista ... -->
 </div>
 
 

@@ -2,7 +2,15 @@ import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { isPlatformBrowser } from '@angular/common';
 import { Observable, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
+import { catchError, tap, map } from 'rxjs/operators';
+
+export interface RezervacijaPayload {
+  film_title?: string | null;
+  datum?: string | null;            // <— sada sme i null
+  screening_id?: number | null;     // <— novo polje
+  seats: { row: string; num: number }[];
+  total?: number | null;
+}
 
 @Injectable({ providedIn: 'root' })
 export class FilmoviService {
@@ -180,7 +188,7 @@ export class FilmoviService {
   }
 
   /** Potvrda rezervacije (čuva u bazi; autorizovano) */
-  postRezervacija(body: {
+  /*postRezervacija(body: {
     film_title: string;
     datum: string;
     seats: { row: string; num: number }[];
@@ -196,7 +204,49 @@ export class FilmoviService {
         return throwError(() => new Error(msg));
       })
     );
-  }
+  }*/
+ postRezervacija(body: RezervacijaPayload): Observable<any> {
+  return this.http.post(`${this.apiBase}/rezervacije`, body, {
+    headers: this.authHeaders()
+  });
+}
+/** Moje rezervacije (normalizuje hall, starts_date, starts_time) */
+getMyReservations(): Observable<any[]> {
+  return this.http.get<any[]>(`${this.apiBase}/rezervacije`, {
+    headers: this.authHeaders()
+  }).pipe(
+    map(rows => (rows || []).map((r: any) => {
+      // prioritet: već razdvojena polja sa backend-a
+      let startsDate = r.starts_date || '';
+      let startsTime = r.starts_time || '';
+      let hall       = r.hall || '';
+
+      // ako dobijamo samo starts_at: "YYYY-MM-DD HH:mm:ss"
+      if ((!startsDate || !startsTime) && r.starts_at) {
+        const iso = String(r.starts_at).replace(' ', 'T');   // "2025-11-03T20:00:00"
+        // bez obzira na vremenske zone, za prikaz je dovoljno iseći string:
+        startsDate = iso.slice(0, 10); // YYYY-MM-DD
+        startsTime = iso.slice(11, 16); // HH:mm
+      }
+
+      // fallback na staro polje datum (ako nema screenings)
+      if (!startsDate && r.datum) startsDate = r.datum;
+
+      return {
+        ...r,
+        hall,
+        starts_date: startsDate,
+        starts_time: startsTime,
+      };
+    })),
+    catchError(err => {
+      console.error('Greška pri čitanju rezervacija:', err);
+      return throwError(() => new Error('Greška pri čitanju rezervacija'));
+    })
+  );
+}
+
+
 
   // ==========================
   // SCREENINGS (termini projekcija)
@@ -306,4 +356,5 @@ export class FilmoviService {
       })
     );
   }
+  
 }

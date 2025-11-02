@@ -300,20 +300,15 @@ export class FilmoviComponent {
 
   // ========== OWNER: Import i CRUD ==========
   importExternal(): void {
-    const query = (this.externalIdToImport || '').trim();
-    if (!query) {
-      alert('Unesi naziv filma za import.');
-      return;
-    }
-    this.filmoviService.importFromExternal(query).subscribe({
-      next: () => {
-        alert('Film je importovan u lokalnu bazu. Sada možeš da ga uređuješ.');
-        this.loadFromDb();
-      },
-      error: (err) =>
-        alert(err?.error?.message || 'Greška pri importu filma.'),
-    });
-  }
+  const query = (this.importQuery || '').trim();
+  if (!query) { alert('Unesi naziv filma za import.'); return; }
+  this.filmoviService.importByQuery(query).subscribe({
+    next: () => { alert('Importovano.'); this.loadFromDb(); },
+    error: (err) => alert(err?.error?.message || 'Greška pri importu filma.')
+  });
+}
+
+
 
   addFilm(): void {
     const title = prompt('Naslov novog filma:');
