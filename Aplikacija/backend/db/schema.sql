@@ -21,6 +21,15 @@ USE `auth_db`;
 -- Table structure for table `films`
 --
 
+CREATE TABLE favorites (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  film_id INT NULL,              -- opciono (za kasnije), sada ga ne koristimo
+  film_title VARCHAR(255) NULL,  -- koristimo naslov kao ključ
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_user_title (user_id, film_title)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 DROP TABLE IF EXISTS `films`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
