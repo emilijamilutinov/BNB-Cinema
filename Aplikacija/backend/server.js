@@ -799,48 +799,104 @@ app.put('/api/screenings/:id', auth, checkRole('owner'), async (req, res) => {
 });
 
 // obriši projekciju (samo owner)
+// obriši projekciju (samo owner) — KASKADNO (taken_seats + reservations + screenings)
+// obriši projekciju (samo owner) — KASKADNO + čišćenje omiljenih ako film više nema projekcija
 app.delete('/api/screenings/:id', auth, checkRole('owner'), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ message: 'Neispravan id' });
+
+  const conn = await pool.getConnection();
   try {
-    const id = Number(req.params.id);
-    // opciono: obriši i zauzeta sedišta/rezervacije za ovaj screening ako koristiš isključivo screening_id
-    await pool.execute(`DELETE FROM screenings WHERE id = :id`, { id });
-    res.json({ ok: true });
+    await conn.beginTransaction();
+
+    // 0) Zaključaj i saznaj film_id pre brisanja
+    const [scRow] = await conn.execute(
+      `SELECT film_id FROM screenings WHERE id = :id FOR UPDATE`,
+      { id }
+    );
+    if (!scRow.length) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Projekcija nije nađena' });
+    }
+    const filmId = scRow[0].film_id;
+
+    // 1) Počisti zauzeta sedišta i rezervacije za ovaj screening
+    const [ts] = await conn.execute(`DELETE FROM taken_seats WHERE screening_id = :id`, { id });
+    const [rv] = await conn.execute(`DELETE FROM reservations WHERE screening_id = :id`, { id });
+
+    // 2) Obriši sam screening
+    const [sc] = await conn.execute(`DELETE FROM screenings WHERE id = :id`, { id });
+
+    // 3) Da li film ima još aktivnih projekcija?
+    const [[{ cnt_active }]] = await conn.execute(
+      `SELECT COUNT(*) AS cnt_active
+         FROM screenings
+        WHERE film_id = :fid AND is_active = 1`,
+      { fid: filmId }
+    );
+
+    if (cnt_active === 0) {
+      // 3a) Ugasimo film da ne izlazi na listama
+      await conn.execute(`UPDATE films SET active = 0 WHERE id = :fid`, { fid: filmId });
+
+      // 3b) Obrišemo ga iz omiljenih (preko naslova)
+      const [[{ title }]] = await conn.execute(
+        `SELECT title FROM films WHERE id = :fid`,
+        { fid: filmId }
+      );
+      if (title) {
+        await conn.execute(`DELETE FROM favorites WHERE film_title = :t`, { t: title });
+      }
+    }
+
+    await conn.commit();
+    return res.json({
+      ok: true,
+      deleted: {
+        screenings: sc.affectedRows || 0,
+        reservations: rv.affectedRows || 0,
+        taken_seats: ts.affectedRows || 0,
+      },
+      film_deactivated: (cnt_active === 0) ? true : false
+    });
   } catch (e) {
-    console.error('DELETE screenings error:', e);
-    res.status(500).json({ message: 'Greška pri brisanju projekcije' });
+    try { await conn.rollback(); } catch {}
+    console.error('DELETE /api/screenings/:id error:', e);
+    return res.status(500).json({ message: 'Greška pri brisanju projekcije' });
+  } finally {
+    conn.release();
   }
 });
+
 // === FAVORITES (po naslovu) ===
 
 // Lista mojih omiljenih
 app.get('/api/favorites', auth, async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT film_title FROM favorites WHERE user_id = :uid ORDER BY created_at DESC`,
+      `SELECT DISTINCT f.film_title
+         FROM favorites f
+         JOIN films m
+           ON m.title COLLATE utf8mb4_general_ci
+            = f.film_title COLLATE utf8mb4_general_ci
+        WHERE f.user_id = :uid
+          AND m.active = 1
+          AND EXISTS (
+                SELECT 1
+                  FROM screenings s
+                 WHERE s.film_id = m.id
+                   AND s.is_active = 1
+          )
+        ORDER BY f.film_title`,
       { uid: req.user.id }
     );
     res.json(rows.map(r => ({ film_title: r.film_title })));
-  } catch (e) {
-    console.error('GET /api/favorites', e);
-    res.status(500).json({ message: 'Greška' });
+  } catch (err) {
+    console.error('GET /api/favorites error:', err);
+    res.status(500).json({ message: 'Greška pri čitanju omiljenih' });
   }
 });
 
-// Da li je dati naslov u omiljenim
-app.get('/api/favorites/is', auth, async (req, res) => {
-  const ft = String(req.query.film_title || '').trim();
-  if (!ft) return res.status(400).json({ message: 'film_title?' });
-  try {
-    const [rows] = await pool.execute(
-      `SELECT 1 FROM favorites WHERE user_id = :uid AND film_title = :ft LIMIT 1`,
-      { uid: req.user.id, ft }
-    );
-    res.json({ isFavorite: rows.length > 0 });
-  } catch (e) {
-    console.error('GET /api/favorites/is', e);
-    res.status(500).json({ message: 'Greška' });
-  }
-});
 
 // Toggle omiljenog po naslovu
 app.post('/api/favorites/toggle', auth, async (req, res) => {
