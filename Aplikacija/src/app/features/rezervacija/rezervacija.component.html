@@ -84,5 +84,13 @@
     </div>
 
     <button type="button" (click)="potvrdiRezervaciju()">Potvrdi rezervaciju</button>
+    
+
+    <button class="fav-btn" type="button" [class.active]="isFavorite" (click)="toggleFavorite()" [attr.aria-pressed]="isFavorite ? 'true' : 'false'">
+  <span *ngIf="isFavorite">❤</span>
+  <span *ngIf="!isFavorite">♡</span>
+</button>
+
+
   </form>
 </div>

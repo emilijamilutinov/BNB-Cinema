@@ -398,7 +398,7 @@ app.post('/api/reviews', auth, async (req, res) => {
     if (!filmId) filmId = makeIdFromTitle(filmTitle);
 
     // proveru gledanja uključi u (ENV)
-    if (process.env.REVIEW_REQUIRE_RESERVATION !== 'false') {
+    /*if (process.env.REVIEW_REQUIRE_RESERVATION !== 'false') {
       const norm = s => (s || '').toLowerCase()  //normalizator naziva filma
         .replace(/["'’‘“”\-.,:;(){}\[\]!?\s]/g, '')
         .replace(/č/g,'c').replace(/ć/g,'c').replace(/š/g,'s').replace(/ž/g,'z').replace(/đ/g,'dj');
@@ -410,7 +410,7 @@ app.post('/api/reviews', auth, async (req, res) => {
       );
       const ok = rs.some(r => { const t = norm(r.film_title); return t.includes(want) || want.includes(t); });
       if (!ok) return res.status(403).json({ message: 'Možeš oceniti samo film koji si gledao.' });
-    }
+    }*/
 
     const [dupe] = await pool.execute(
       `SELECT id FROM reviews WHERE filmId = :fid AND email = :e LIMIT 1`,
@@ -548,7 +548,7 @@ app.get('/api/films/:id', async (req, res) => {
 });
 
 // OWNER: kreiranje filma ručno
-app.post('/api/films', auth, checkRole('owner'), async (req, res) => {
+/*app.post('/api/films', auth, checkRole('owner'), async (req, res) => {
   try {
     const {
       title, description=null, director=null, release_date=null, genre=null,
@@ -600,7 +600,7 @@ app.put('/api/films/:id', auth, checkRole('owner'), async (req, res) => {
     console.error('PUT /api/films/:id error:', e);
     res.status(500).json({ message: 'Greška pri izmeni' });
   }
-});
+});*/
 
 // OWNER: brisanje
 app.delete('/api/films/:id', auth, checkRole('owner'), async (req, res) => {
@@ -732,7 +732,7 @@ app.post('/api/films/:filmId/screenings', auth, checkRole('owner'), async (req, 
 // ======= SCREENINGS (projekcije) =======
 
 // sve projekcije za film
-app.get('/api/films/:filmId/screenings', async (req, res) => {
+/*app.get('/api/films/:filmId/screenings', async (req, res) => {
   try {
     const filmId = Number(req.params.filmId);
     const [rows] = await pool.execute(
@@ -746,10 +746,10 @@ app.get('/api/films/:filmId/screenings', async (req, res) => {
     console.error('GET screenings error:', e);
     res.status(500).json({ message: 'Greška' });
   }
-});
+});*/
 
 // kreiraj projekciju (samo owner)
-app.post('/api/films/:filmId/screenings', auth, checkRole('owner'), async (req, res) => {
+/*app.post('/api/films/:filmId/screenings', auth, checkRole('owner'), async (req, res) => {
   try {
     const filmId = Number(req.params.filmId);
     const {
@@ -772,7 +772,7 @@ app.post('/api/films/:filmId/screenings', auth, checkRole('owner'), async (req, 
     console.error('POST screenings error:', e);
     res.status(500).json({ message: 'Greška pri kreiranju projekcije' });
   }
-});
+});*/
 
 // izmeni projekciju (samo owner)
 app.put('/api/screenings/:id', auth, checkRole('owner'), async (req, res) => {
@@ -808,6 +808,63 @@ app.delete('/api/screenings/:id', auth, checkRole('owner'), async (req, res) => 
   } catch (e) {
     console.error('DELETE screenings error:', e);
     res.status(500).json({ message: 'Greška pri brisanju projekcije' });
+  }
+});
+// === FAVORITES (po naslovu) ===
+
+// Lista mojih omiljenih
+app.get('/api/favorites', auth, async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT film_title FROM favorites WHERE user_id = :uid ORDER BY created_at DESC`,
+      { uid: req.user.id }
+    );
+    res.json(rows.map(r => ({ film_title: r.film_title })));
+  } catch (e) {
+    console.error('GET /api/favorites', e);
+    res.status(500).json({ message: 'Greška' });
+  }
+});
+
+// Da li je dati naslov u omiljenim
+app.get('/api/favorites/is', auth, async (req, res) => {
+  const ft = String(req.query.film_title || '').trim();
+  if (!ft) return res.status(400).json({ message: 'film_title?' });
+  try {
+    const [rows] = await pool.execute(
+      `SELECT 1 FROM favorites WHERE user_id = :uid AND film_title = :ft LIMIT 1`,
+      { uid: req.user.id, ft }
+    );
+    res.json({ isFavorite: rows.length > 0 });
+  } catch (e) {
+    console.error('GET /api/favorites/is', e);
+    res.status(500).json({ message: 'Greška' });
+  }
+});
+
+// Toggle omiljenog po naslovu
+app.post('/api/favorites/toggle', auth, async (req, res) => {
+  const ft = String(req.body?.film_title || '').trim();
+  if (!ft) return res.status(400).json({ message: 'film_title?' });
+
+  try {
+    const [rows] = await pool.execute(
+      `SELECT id FROM favorites WHERE user_id = :uid AND film_title = :ft LIMIT 1`,
+      { uid: req.user.id, ft }
+    );
+    if (rows.length) {
+      await pool.execute(`DELETE FROM favorites WHERE id = :id`, { id: rows[0].id });
+      return res.json({ isFavorite: false });
+    } else {
+      await pool.execute(
+        `INSERT INTO favorites (user_id, film_title) VALUES (:uid, :ft)`,
+        { uid: req.user.id, ft }
+      );
+      return res.json({ isFavorite: true });
+    }
+  } catch (e) {
+    console.error('POST /api/favorites/toggle', e);
+    res.status(500).json({ message: 'Greška' });
   }
 });
 

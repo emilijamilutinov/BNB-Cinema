@@ -32,10 +32,14 @@ export class RezervacijaComponent implements OnInit {
       ? { headers: new HttpHeaders({ Authorization: `Bearer ${token}` }) }
       : {};
   }
+
   @Output() korpaOsvezena = new EventEmitter<void>();
 
   film: any = null;
   korisnickoIme = '';
+
+  // Omiljeni film (UI srce)
+  isFavorite = false;
 
   // Termini (projekcije) iz lokalne baze:
   screenings: any[] = [];
@@ -70,7 +74,35 @@ export class RezervacijaComponent implements OnInit {
       );
       this.initSeats();                 // nacrtaj praznu salu
       this.loadScreeningsForLocalFilm();// ako postoji lokalni film, ucitaj njegove projekcije
+      this.loadFavoriteFlag();          //  proveri da li je film u omiljenim
     });
+  }
+
+  // Provera da li je trenutni film u omiljenim
+  private loadFavoriteFlag(): void {
+    if (!this.film?.title) { this.isFavorite = false; return; }
+    this.filmoviService.isFavoriteByTitle(this.film.title)
+      .subscribe({
+        next: r => this.isFavorite = !!r?.isFavorite,
+        error: () => this.isFavorite = false
+      });
+  }
+
+  // Toggle 
+  toggleFavorite(): void {
+    if (!this.film?.title) return;
+
+    const prev = this.isFavorite;        
+    this.isFavorite = !prev;
+
+    this.filmoviService.toggleFavoriteByTitle(this.film.title)
+      .subscribe({
+        next: r => this.isFavorite = !!r?.isFavorite,
+        error: () => {
+          this.isFavorite = prev;        // rollback ako BE pukne
+          alert('Nije uspelo čuvanje omiljenog filma.');
+        }
+      });
   }
 
   // Učitaj projekcije (screenings) iz lokalne baze za film istog naslova
@@ -171,12 +203,12 @@ export class RezervacijaComponent implements OnInit {
       .reduce((sum, s) => sum + this.seatPrice(s), 0);
   }
 
-  // ====== NOVO: confirm poziv na BE ======
+  // ====== confirm poziv na BE (utorak -15%) ======
   private confirmReservation(id: number) {
     return this.http.post<any>(
       `${this.apiBase}/api/rezervacije/${id}/confirm`,
       {},
-      this.authHeaders()            // ⬅️ pošto BE traži auth
+      this.authHeaders()
     );
   }
 
@@ -191,8 +223,8 @@ export class RezervacijaComponent implements OnInit {
       .map(s => ({ row: s.row, num: s.num }));
 
     const payload = {
-      film_title: this.film.title ?? null, // opciono – kompatibilnost
-      datum: null,                         // više ga ne koristimo kada imamo screening_id
+      film_title: this.film.title ?? null,
+      datum: null,
       screening_id: this.selectedScreeningId,
       seats: seatsMin,
       total: this.totalPrice,
@@ -203,7 +235,6 @@ export class RezervacijaComponent implements OnInit {
       next: (resp: any) => {
         const newId = resp?.id;
         if (!newId) {
-          // Fallback: ako BE ne vrati id, ponašaj se kao i do sada
           this.korpaOsvezena.emit();
           alert(`"${this.film.title}" je uspešno rezervisan!`);
           this.router.navigate(['/filmovi']);
@@ -226,7 +257,6 @@ export class RezervacijaComponent implements OnInit {
           },
           error: err => {
             console.error('confirm error', err);
-            // Rezervacija postoji, ali popust nije primenjen
             this.korpaOsvezena.emit();
             alert(`Rezervacija je kreirana. (Napomena: popust nije primenjen zbog greške)`);
             this.router.navigate(['/filmovi']);
@@ -239,5 +269,4 @@ export class RezervacijaComponent implements OnInit {
       }
     });
   }
-  
 }

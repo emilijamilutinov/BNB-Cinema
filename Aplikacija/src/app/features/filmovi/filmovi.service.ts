@@ -316,5 +316,40 @@ getMyReservations(): Observable<any[]> {
       })
     );
   }
+  // === FAVORITES (po naslovu) ===
+getFavorites() {
+  return this.http.get<{ film_title: string }[]>(
+    `${this.apiBase}/favorites`,
+    { headers: this.authHeaders() }
+  );
+}
+
+isFavoriteByTitle(title: string) {
+  const params = new HttpParams().set('film_title', title);
+  return this.http.get<{ isFavorite: boolean }>(
+    `${this.apiBase}/favorites/is`,
+    { headers: this.authHeaders(), params }
+  );
+}
+
+toggleFavoriteByTitle(title: string) {
+  return this.http.post<{ isFavorite: boolean }>(
+    `${this.apiBase}/favorites/toggle`,
+    { film_title: title },
+    { headers: this.authHeaders() }
+  );
+}
+// profil (PATCH /api/user)
+updateUser(body: { username?: string; password?: string }) {
+  return this.http.patch(`${this.apiBase}/user`, body, { headers: this.authHeaders() });
+}
+
+
+
+// delete reservation
+deleteReservation(id: number) {
+  return this.http.delete(`${this.apiBase}/rezervacije/${id}`, { headers: this.authHeaders() });
+}
+
   
 }

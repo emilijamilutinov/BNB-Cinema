@@ -1,94 +1,195 @@
-body {
-  background-color: #111;
-  font-family: Arial, sans-serif;
-}
-.profile-container{
-  color: white;
-}
-.naloginfo{
-  text-align: left;
-}
 .profile-container {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+}
+
+.account-info, .right-pane {
+  background: #1c1c1c;
+  padding: 16px;
+  border-radius: 10px;
+}
+
+.naloginfo { margin: 6px 0; }
+.form-block { margin-top: 16px; display: grid; gap: 8px; }
+.save-button { margin-top: 8px; }
+
+.tabs {
   display: flex;
-  justify-content: space-between;
-  padding: 20px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
-
-.account-info{
-  padding: 20px;
-  border-right: 3px solid #f5c518;
-}
-
-.account-info {
-  width: 30%;
-}
-
-.account-info input {
-  display: block;
-  width: 30%;
-  padding: 8px;
-  text-align: center;
-  margin: auto;
-  margin-top: 8px;
-  margin-bottom: 8px;
-  border: 2px solid #f5c518;
-  background: black;
-  color: #f5c518;
-}
-
-.save-button {
-  width: 85%;
-  padding: 12px;
-  background: linear-gradient(45deg, #ffcc00, #ff6600);
-  color: black;
-  font-weight: bold;
-  border: none;
-  border-radius: 8px;
-  margin-top: 10px;
+.tab-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
   cursor: pointer;
-  font-size: 16px;
-  text-transform: uppercase;
-  transition: all 0.3s ease-in-out;
-  box-shadow: 0px 4px 8px rgba(255, 204, 0, 0.5);
+}
+.tab-btn.active {
+  background: #ffc107;
+  color: #111;
+  border-color: #ffc107;
 }
 
-.save-button:hover {
-  background: linear-gradient(45deg, #ff6600, #ffcc00);
-  transform: scale(1.05);
-  box-shadow: 0px 6px 12px rgba(255, 204, 0, 0.7);
-}
-
-.save-button:active {
-  transform: scale(0.95);
-}
-
-
-.brisirez{
-  padding: 8px;
-  width: 50%;
-  margin-top: 0px;
-  font-size: 12px;
-}
-.reservations {
-  width: 72%;
-  text-align: center;
-}
-
-.table-container {
-  padding: 10px;
-  overflow-x: auto;
-}
-
-table {
+.table-container table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+}
+.table-container th, .table-container td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #333;
 }
 
-th, td {
-  border: 1px solid #f5c518;
-  padding: 10px;
-  text-align: center;
-  white-space: nowrap;
+.fav-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.fav-card {
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+.fav-title { font-weight: 600; }
+.fav-actions { display: flex; gap: 8px; }
+.fav-reserve {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #ffc107;
+  color: #111;
+  border: none;
+  cursor: pointer;
+}
+.muted { color: #9a9a9a; }
+.brisirez { background:#444; color:#fff; border-radius:8px; padding:6px 10px; border:none; cursor:pointer; }
+/* === BRAND BOJE === */
+:host {
+  --brand-yellow: #ffcc00;     /* tvoja žuta */
+  --text: #eaeaea;             /* osnovni svetli tekst */
+  --muted: #b6b6b6;            /* sekundarni tekst */
+  --bg-plate: #171717;         /* ploča */
+}
+
+/* Opšti tekst */
+.profile-container {
+  color: var(--text);
+}
+
+/* NASLOVI (levo i desno) */
+.account-info h2,
+.reservations h2,
+.favorites h2,
+.profile-container h2 {
+  color: var(--brand-yellow);
+  letter-spacing: .5px;
+  margin-bottom: 12px;
+}
+
+/* Sekundarni “label” tekst levo */
+.naloginfo,
+.account-info label {
+  color: var(--muted);
+}
+
+/* TAB dugmad (Rezervacije / Omiljeni) */
+.tabs { display: flex; gap: 12px; margin-bottom: 18px; }
+.tabs .tab-btn {
+  background: transparent;
+  border: 1px solid var(--brand-yellow);
+  color: var(--brand-yellow);
+  padding: 8px 14px;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: .2s ease;
+}
+.tabs .tab-btn:hover { filter: brightness(1.1); }
+.tabs .tab-btn.active {
+  background: var(--brand-yellow);
+  color: #111;
+}
+
+/* TABELA REZERVACIJA */
+.table-container { background: var(--bg-plate); border-radius: 14px; padding: 12px; }
+.table-container table { width: 100%; border-collapse: collapse; }
+.table-container thead th {
+  color: var(--brand-yellow);
+  font-weight: 600;
+  padding: 12px 10px;
+  border-bottom: 1px solid #2b2b2b;
+}
+.table-container tbody td {
+  padding: 12px 10px;
+  color: var(--text);
+  border-bottom: 1px solid #212121;
+}
+.brisirez {
+  background: transparent;
+  border: 1px solid var(--brand-yellow);
+  color: var(--brand-yellow);
+  padding: 6px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+}
+.brisirez:hover { background: var(--brand-yellow); color: #111; }
+
+/* OMILJENI — kartice */
+.fav-card {
+  background: var(--bg-plate);
+  border: 1px solid #2b2b2b;
+  border-radius: 16px;
+  padding: 16px;
+}
+.fav-title { color: var(--brand-yellow); font-weight: 600; }
+
+/* Link “Rezerviši” na kartici omiljenog */
+a.fav-action,
+.fav-action {
+  color: var(--brand-yellow) !important;
+  text-decoration: none;
+  font-weight: 600;
+}
+a.fav-action:hover { text-decoration: underline; }
+
+/* Inputi i dugme “Sačuvaj promene” levo */
+.account-info input {
+  background: #121212;
+  color: var(--text);
+  border: 1px solid #2b2b2b;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.save-button {
+  background: linear-gradient(180deg, #ffd84d, #ffb300);
+  border: none;
+  color: #111;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.save-button:hover { filter: brightness(1.05); }
+.fav-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--bg-plate);
+  border: 1px solid #2b2b2b;
+}
+
+.fav-poster {
+  width: 90px;
+  height: 135px;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.35);
 }
 

@@ -1,188 +1,237 @@
-import { Component, Inject, OnInit, PLATFORM_ID } from '@angular/core';
-import { Router } from '@angular/router';
-import { jwtDecode } from 'jwt-decode';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { FormsModule } from '@angular/forms';
+import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterModule } from '@angular/router';
 import { FilmoviService } from '../filmovi/filmovi.service';
-
 
 type ReservationVM = {
   id: number;
   film_title: string;
-  seats_json: any[] | string;
-  seats: { row: string; num: number }[];
-  seats_count: number;
-  total: number | null;
-  datum?: string | null;         // fallback (staro polje)
-  hall?: string | null;          // Sala 1 / Sala 2
-  starts_at?: string | null;     // pun ISO/SQL datetime ako backend šalje
-  starts_date?: string | null;   // 2025-11-03
-  starts_time?: string | null;   // 20:00
+  seats_json?: string;
+  seats_count?: number;
+  hall?: string;
+  starts_at?: string;
+  starts_date?: string;
+  starts_time?: string;
+  datum?: string;
+  total?: number;
 };
+
+type FavCard = { title: string; poster: string };
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [FormsModule, CommonModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './profile.component.html',
-  styleUrls: ['./profile.component.css']
+  styleUrls: ['./profile.component.css'],
 })
 export class ProfileComponent implements OnInit {
-  username = 'Nepoznat korisnik';
-  email = 'Nepoznata email adresa';
+  // --- Nalog
+  username = '';
+  email = '';
   newUsername = '';
   newPassword = '';
 
-  // Tabela u profilu čita iz ovoga:
+  // --- Tabovi
+  activeTab: 'reservations' | 'favorites' = 'reservations';
+
+  // --- Rezervacije
   reservations: ReservationVM[] = [];
 
-  isBrowser: boolean;
+  // --- Omiljeni
+  favorites: { film_title: string }[] = [];
+  favCards: FavCard[] = [];               // -> ono što šablon prikazuje (naslov + poster URL)
+  loadingFav = false;
+
+  // --- Helperi
+  private isBrowser = false;
+  private posters: Record<string, string> = {}; // normalizovan_naslov => poster URL
 
   constructor(
     private router: Router,
-    private http: HttpClient,
     private filmoviService: FilmoviService,
-    @Inject(PLATFORM_ID) private platformId: Object
+    @Inject(PLATFORM_ID) platformId: Object
   ) {
-    this.isBrowser = isPlatformBrowser(this.platformId);
+    this.isBrowser = isPlatformBrowser(platformId);
   }
 
   ngOnInit(): void {
     this.loadUserData();
     this.loadReservations();
+    this.loadFavorites(); // pokupi omiljene i pripremi kartice
   }
 
-  /** Normalizacija jedne rezervacije (sala/vreme/sedista/total) */
-  private normalizeReservation(r: any): ReservationVM {
-    // seats: uvek kao niz objekata {row,num}
-    const seats = Array.isArray(r.seats_json)
-      ? r.seats_json
-      : (() => {
-          try { return JSON.parse(r.seats_json || '[]'); }
-          catch { return []; }
-        })();
-
-    // Sala i vreme (podržava više varijanti sa servera)
-    let hall: string | null = r.hall ?? null;
-let startsDate: string | null = r.starts_date ?? null;
-let startsTime: string | null = r.starts_time ?? null;
-
-// 1) Ako imamo starts_at ("YYYY-MM-DD HH:mm:ss") – izreži
-if (r.starts_at && (!startsDate || !startsTime)) {
-  const iso = String(r.starts_at).replace(' ', 'T'); // "YYYY-MM-DDTHH:mm:ss"
-  if (!startsDate) startsDate = iso.slice(0, 10);
-  if (!startsTime) startsTime = iso.slice(11, 16);
-}
-
-// 2) Ako i dalje nema datuma, koristi staro polje 'datum'
-if (!startsDate && r.datum) {
-  startsDate = String(r.datum).slice(0, 10);
-}
-
-
-    return {
-      id: Number(r.id),
-      film_title: r.film_title,
-      seats_json: r.seats_json,
-      seats,
-      seats_count: seats.length,
-      total: (r.total ?? r.total_eur ?? null) !== null ? Number(r.total ?? r.total_eur) : null,
-      datum: r.datum ?? null,
-      hall: hall ?? null,
-      starts_at: r.starts_at ?? null,
-      starts_date: startsDate ?? null,
-      starts_time: startsTime ?? null
-    };
-  }
-
-  /** Poziv backend-a preko servisa; puni tabelu */
-  loadReservations(): void {
+  // ====================== USER ======================
+  private loadUserData(): void {
     if (!this.isBrowser) return;
-    this.filmoviService.getMyReservations().subscribe({
-      next: rows => {
-        this.reservations = (rows || []).map(r => this.normalizeReservation(r));
-      },
-      error: () => { this.reservations = []; }
-    });
-  }
-
-  private authHeaders(): HttpHeaders {
-    if (!this.isBrowser) return new HttpHeaders();
-    const token = localStorage.getItem('token');
-    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
-  }
-
-  loadUserData(): void {
-    if (!this.isBrowser) return;
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const decoded: any = jwtDecode(token);
-        this.username = decoded.username || 'Korisnik';
-        this.email = decoded.email || 'Nepoznata email adresa';
-      } catch (error) {
-        console.error('Greška pri dekodiranju tokena:', error);
-        this.username = 'Nepoznat korisnik';
-        this.email = '';
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        this.username = u?.username || '';
+        this.email = u?.email || '';
       }
-    }
-  }
-
-  removeReservation(reservationId: number): void {
-    if (!this.isBrowser) return;
-    if (!confirm('Da li ste sigurni da želite da uklonite ovu rezervaciju?')) return;
-
-    this.http.delete(`http://localhost:4000/api/rezervacije/${reservationId}`, {
-      headers: this.authHeaders()
-    }).subscribe({
-      next: () => {
-        this.reservations = this.reservations.filter(rez => rez.id !== reservationId);
-      },
-      error: (error) => {
-        console.error('Greška pri brisanju rezervacije:', error);
-        alert('Došlo je do greške pri brisanju rezervacije.');
-      }
-    });
+    } catch {}
   }
 
   updateProfile(): void {
-    if (!this.isBrowser) return;
+    const body: any = {};
+    if (this.newUsername?.trim()) body.username = this.newUsername.trim();
+    if (this.newPassword?.trim()) body.password = this.newPassword.trim();
 
-    if (!this.newUsername && !this.newPassword) {
-      alert('Molimo unesite novo korisničko ime ili novu šifru.');
+    if (!body.username && !body.password) {
+      alert('Nema promena.');
       return;
     }
-    if (this.newPassword && this.newPassword.length < 6) {
-      alert('Lozinka mora imati najmanje 6 karaktera.');
-      return;
-    }
 
-    const payload: any = {};
-    if (this.newUsername) payload.username = this.newUsername.trim();
-    if (this.newPassword) payload.password = this.newPassword;
+    this.filmoviService.updateUser(body).subscribe({
+      next: (resp: any) => {
+        this.username = resp?.user?.username ?? this.username;
 
-    this.http.patch('http://localhost:4000/api/user', payload, {
-      headers: this.authHeaders()
-    }).subscribe({
-      next: (res: any) => {
-        if (res?.token) localStorage.setItem('token', res.token);
-        alert('Podaci su uspešno ažurirani!');
-        this.loadUserData();
+        if (resp?.token && this.isBrowser) {
+          localStorage.setItem('token', resp.token);
+          const userRaw = localStorage.getItem('user');
+          if (userRaw) {
+            const u = JSON.parse(userRaw);
+            u.username = this.username;
+            localStorage.setItem('user', JSON.stringify(u));
+          }
+        }
+
         this.newUsername = '';
         this.newPassword = '';
+        alert('Podaci uspešno ažurirani.');
       },
-      error: (err) => {
-        console.error('Greška pri ažuriranju profila:', err);
-        alert(err?.error?.message || 'Greška pri ažuriranju podataka.');
-      }
+      error: (err) => alert(err?.error?.message || 'Greška pri ažuriranju.'),
     });
   }
 
-  logout(): void {
-    if (this.isBrowser) {
-      localStorage.removeItem('token');
-      this.router.navigate(['/login']);
-    }
+  // ================== REZERVACIJE ==================
+  private normalizeReservation(r: any): ReservationVM {
+    let seatsCount = 0;
+    try {
+      const arr = JSON.parse(r.seats_json || '[]');
+      seatsCount = Array.isArray(arr) ? arr.length : 0;
+    } catch {}
+    return {
+      ...r,
+      seats_count: seatsCount,
+      total: r.total_eur ?? r.total ?? 0,
+    };
+  }
+
+  loadReservations(): void {
+    this.filmoviService.getMyReservations().subscribe({
+      next: (rows) => {
+        this.reservations = (rows || []).map((r) => this.normalizeReservation(r));
+      },
+      error: () => (this.reservations = []),
+    });
+  }
+
+  removeReservation(id: number): void {
+    if (!confirm('Da li ste sigurni da želite da uklonite rezervaciju?')) return;
+    this.filmoviService.deleteReservation(id).subscribe({
+      next: () => {
+        this.reservations = this.reservations.filter((r) => r.id !== id);
+      },
+      error: (err) => alert(err?.error?.message || 'Greška pri brisanju.'),
+    });
+  }
+
+  // =================== OMILJENI ====================
+  loadFavorites(): void {
+    this.loadingFav = true;
+    this.filmoviService.getFavorites().subscribe({
+      next: (rows: any) => {
+        this.favorites = Array.isArray(rows) ? rows : [];
+        this.loadingFav = false;
+        this.refreshFavoriteCards();     // popuni favCards + dovuci postere
+      },
+      error: () => {
+        this.favorites = [];
+        this.favCards = [];
+        this.loadingFav = false;
+      },
+    });
+  }
+
+  /** Prvo prikaže placeholder-e, zatim popuni postere pa ponovo izgradi kartice. */
+  private refreshFavoriteCards(): void {
+    this.buildFavCards();           // odmah prikaži sa placeholder-ima
+    this.loadPostersForFavorites(); // kad posteri stignu, opet izgradi
+  }
+
+  private buildFavCards(): void {
+    const ph = 'assets/images/poster-placeholder.png';
+    this.favCards = (this.favorites || []).map((f) => {
+      const title = f.film_title;
+      const key = this.normTitle(title);
+      const poster = this.posters[key] || ph;
+      return { title, poster };
+    });
+  }
+
+  /** Dovlači URL-ove postera i u mapu `posters` ih kešira. */
+  private loadPostersForFavorites(): void {
+    const favTitles = (this.favorites || []).map((f) => f.film_title).filter(Boolean);
+    if (!favTitles.length) return;
+
+    const wanted = new Set(favTitles.map((t) => this.normTitle(t)));
+
+    // 1) lokalni filmovi
+    this.filmoviService.getFilms().subscribe({
+      next: (locals) => {
+        for (const lf of locals || []) {
+          const k = this.normTitle(lf.title);
+          if (wanted.has(k) && lf.poster_url) this.posters[k] = lf.poster_url;
+        }
+
+        // 2) spoljni API
+        this.filmoviService.getFilmovi().subscribe({
+          next: (ext) => {
+            for (const em of ext || []) {
+              const k = this.normTitle(em.title);
+              if (wanted.has(k) && !this.posters[k] && em.poster) {
+                this.posters[k] = em.poster;
+              }
+            }
+            // kada imamo što više postera osvezi kartice
+            this.buildFavCards();
+          },
+          error: () => this.buildFavCards(),
+        });
+      },
+      error: () => this.buildFavCards(),
+    });
+  }
+
+  // ===================== Ostalo ====================
+  goReserveByTitle(title: string): void {
+    this.router.navigate(['/rezervacija', title]);
+  }
+
+  setTab(tab: 'reservations' | 'favorites') {
+    this.activeTab = tab;
+    if (tab === 'favorites' && !this.favorites.length) this.loadFavorites();
+  }
+
+  private normTitle(t: string): string {
+    return String(t || '')
+      .trim()
+      .toLowerCase()
+      .replace(/["'’‘“”\-.,:;(){}\[\]!?\s]/g, '')
+      .replace(/č/g, 'c')
+      .replace(/ć/g, 'c')
+      .replace(/š/g, 's')
+      .replace(/ž/g, 'z')
+      .replace(/đ/g, 'dj');
+  }
+
+  onPosterError(ev: Event) {
+    const img = ev.target as HTMLImageElement;
+    img.onerror = null; // spreči loop
+    img.src = 'assets/images/poster-placeholder.png';
   }
 }

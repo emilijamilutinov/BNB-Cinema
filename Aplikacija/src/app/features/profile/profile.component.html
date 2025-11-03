@@ -1,93 +1,129 @@
 <div class="profile-container">
+
   <!-- LEVA STRANA: PODACI O NALOGU -->
   <section class="account-info">
     <h2>PODACI O NALOGU:</h2>
     <p class="naloginfo"><strong>KORISNIČKO IME:</strong> {{ username }}</p>
     <p class="naloginfo"><strong>E-MAIL:</strong> {{ email }}</p>
 
-    <div style="margin-top: 20px;">
+    <div class="form-block">
       <label for="newUsername">Novo korisničko ime:</label>
-      <input
-        id="newUsername"
-        type="text"
-        [(ngModel)]="newUsername"
-        placeholder="Unesite novo ime"
-      />
+      <input id="newUsername" type="text" [(ngModel)]="newUsername" placeholder="Unesite novo ime" />
 
-      <label for="newPassword" style="margin-top: 12px; display:block;">Nova šifra:</label>
-      <input
-        id="newPassword"
-        type="password"
-        [(ngModel)]="newPassword"
-        placeholder="Unesite novu šifru"
-      />
+      <label for="newPassword">Nova šifra:</label>
+      <input id="newPassword" type="password" [(ngModel)]="newPassword" placeholder="Unesite novu šifru" />
 
       <button class="save-button" (click)="updateProfile()">SAČUVAJ PROMENE</button>
     </div>
   </section>
 
-  <!-- DESNA STRANA: REZERVACIJE -->
-  <section class="reservations">
-    <h2>Vaše rezervacije:</h2>
+  <!-- DESNA STRANA: TABOVI -->
+  <section class="right-pane">
 
-    <div class="table-container" *ngIf="reservations?.length; else noData">
-      <table>
-        <thead>
-          <tr>
-            <th>Film</th>
-            <th>Broj karata</th>
-            <th>Datum</th>
-            <th>Sala</th>
-            <th>Vreme</th>
-            <th>Ukupno</th>
-            <th>Akcija</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr *ngFor="let rez of reservations">
-            <td>{{ rez.film_title }}</td>
-            <td>{{ rez.seats_count }}</td>
-
-            <!-- DATUM (YYYY-MM-DD) -->
-            <td>
-              <ng-container *ngIf="rez.starts_at; else fromStartDate">
-                {{ (rez.starts_at | date:'yyyy-MM-dd') }}
-              </ng-container>
-              <ng-template #fromStartDate>
-                <ng-container *ngIf="rez.starts_date; else fromLegacyDatum">
-                  {{ rez.starts_date | date:'yyyy-MM-dd' }}
-                </ng-container>
-                <ng-template #fromLegacyDatum>
-                  {{ rez.datum || '—' }}
-                </ng-template>
-              </ng-template>
-            </td>
-
-            <!-- SALA -->
-            <td>{{ rez.hall || '—' }}</td>
-
-            <!-- VREME (HH:mm) -->
-            <td>
-              <ng-container *ngIf="rez.starts_at; else fromStartTime">
-                {{ (rez.starts_at | date:'HH:mm') }}
-              </ng-container>
-              <ng-template #fromStartTime>
-                {{ rez.starts_time || '—' }}
-              </ng-template>
-            </td>
-
-            <td>{{ rez.total | number:'1.2-2' }} €</td>
-            <td>
-              <button class="brisirez" (click)="removeReservation(rez.id)">UKLONI</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Tabs -->
+    <div class="tabs">
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'reservations'"
+        (click)="setTab('reservations')">
+        Rezervacije
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'favorites'"
+        (click)="setTab('favorites')">
+        Omiljeni
+      </button>
     </div>
 
-    <ng-template #noData>
-      <p>Nema sačuvanih rezervacija.</p>
-    </ng-template>
+    <!-- TAB: Rezervacije -->
+    <div *ngIf="activeTab === 'reservations'">
+      <h2>Vaše rezervacije</h2>
+      <div class="table-container" *ngIf="reservations?.length; else noRez">
+        <table>
+          <thead>
+            <tr>
+              <th>Film</th>
+              <th>Broj karata</th>
+              <th>Datum</th>
+              <th>Sala</th>
+              <th>Vreme</th>
+              <th>Ukupno</th>
+              <th>Akcija</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let rez of reservations">
+              <td>{{ rez.film_title }}</td>
+              <td>{{ rez.seats_count }}</td>
+
+              <!-- DATUM -->
+              <td>
+                <ng-container *ngIf="rez.starts_at; else fromStartDate">
+                  {{ (rez.starts_at | date:'yyyy-MM-dd') }}
+                </ng-container>
+                <ng-template #fromStartDate>
+                  <ng-container *ngIf="rez.starts_date; else fromLegacyDatum">
+                    {{ rez.starts_date | date:'yyyy-MM-dd' }}
+                  </ng-container>
+                  <ng-template #fromLegacyDatum>
+                    {{ rez.datum || '—' }}
+                  </ng-template>
+                </ng-template>
+              </td>
+
+              <td>{{ rez.hall || '—' }}</td>
+
+              <!-- VREME -->
+              <td>
+                <ng-container *ngIf="rez.starts_at; else fromStartTime">
+                  {{ (rez.starts_at | date:'HH:mm') }}
+                </ng-container>
+                <ng-template #fromStartTime>
+                  {{ rez.starts_time || '—' }}
+                </ng-template>
+              </td>
+
+              <td>{{ rez.total | number:'1.2-2' }} €</td>
+              <td>
+                <button class="brisirez" (click)="removeReservation(rez.id)">UKLONI</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noRez>
+        <p>Nema sačuvanih rezervacija.</p>
+      </ng-template>
+    </div>
+
+    <!-- TAB: Omiljeni -->
+    <div *ngIf="activeTab === 'favorites'">
+      <h2>Omiljeni filmovi</h2>
+
+      <div *ngIf="loadingFav" class="muted">Učitavanje…</div>
+
+      <div *ngIf="!loadingFav && !favorites?.length" class="muted">
+        Nema omiljenih filmova.
+      </div>
+
+      <ul class="fav-list">
+  <li class="fav-card" *ngFor="let f of favCards">
+  <img
+    class="fav-poster"
+    [src]="f.poster"
+    width="140" height="210"
+    loading="lazy"
+    decoding="async"
+    (error)="onPosterError($event)"
+  />
+  <div class="fav-title">{{ f.title }}</div>
+  <button class="fav-reserve" (click)="goReserveByTitle(f.title)">Rezerviši</button>
+</li>
+
+</ul>
+
+    </div>
+
   </section>
 </div>
